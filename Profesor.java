@@ -1,39 +1,23 @@
-import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class Profesor {
-    private int id;
+    private final String id = UUID.randomUUID().toString();
     private String nombre;
-    private List<String> preferencias = new ArrayList<>();
+    private List<String> diasDisponibles; // e.g., ["Lunes","Martes"]
 
-    public Profesor(int id,String nombre){
-        this.id = id;
+    public Profesor(String nombre, List<String> diasDisponibles) {
         this.nombre = nombre;
+        this.diasDisponibles = diasDisponibles;
     }
 
-    public int getId() {
-        return id;
-    }
+    public String getId() { return id; }
+    public String getNombre() { return nombre; }
+    public List<String> getDiasDisponibles() { return diasDisponibles; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
+    public void setDiasDisponibles(List<String> diasDisponibles) { this.diasDisponibles = diasDisponibles; }
 
-    public void setId(int id) {
-        this.id = id;
+    public boolean disponibleEn(String dia) {
+        return diasDisponibles == null || diasDisponibles.isEmpty() || diasDisponibles.contains(dia);
     }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public List<String> getPreferencias() {
-        return preferencias;
-    }
-
-    public void setPreferencias(List<String> preferencias) {
-        this.preferencias = preferencias;
-    }
-
-    
 }
