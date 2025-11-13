@@ -29,7 +29,7 @@ public class ValidadorPorProfesor implements Validador {
         String profesorId = bloque.getProfesorId();
         if (profesorId == null) return true; // Si no tiene id, permitir
         
-        Profesor p = catalogo.getProfesor(profesorId);
+        Profesor p = catalogo.obtenerProfesorPorId(profesorId);
         if (p == null) return false; // Profesor no encontrado
         
         return p.disponibleEn(bloque.getDia());
@@ -39,7 +39,7 @@ public class ValidadorPorProfesor implements Validador {
     public String getTipoConflicto(BloqueHorario bloqueA, BloqueHorario bloqueB) {
         StringBuilder sb = new StringBuilder("Conflicto de disponibilidad de profesor: ");
         if (bloqueA.getDia() != null) {
-            Profesor pA = catalogo.getProfesor(bloqueA.getProfesorId());
+            Profesor pA = catalogo.obtenerProfesorPorId(bloqueA.getProfesorId());
             if (pA != null && !pA.disponibleEn(bloqueA.getDia())) {
                 sb.append(pA.getNombre()).append(" no disponible en ").append(bloqueA.getDia());
             }

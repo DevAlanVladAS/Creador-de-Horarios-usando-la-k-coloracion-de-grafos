@@ -2,13 +2,17 @@ import java.util.UUID;
 
 public class Salon {
     private final String id = UUID.randomUUID().toString();
-    private String nombre;
+    private String nombre; // e.g., "Aula 101"
+    private int capacidad;
 
-    public Salon(String nombre) {
+    public Salon(String nombre, int capacidad) {
         this.nombre = nombre;
+        this.capacidad = capacidad;
     }
 
     public String getId() { return id; }
     public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
+    public int getCapacidad() { return capacidad; }
+    
+  
 }
