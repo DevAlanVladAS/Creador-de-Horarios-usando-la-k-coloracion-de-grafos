@@ -1,25 +1,23 @@
 import java.time.LocalTime;
 
 public class ValidadorPorHora implements Validador {
-    private LocalTime horaInicioPermitida;
-    private LocalTime horaFinPermitida;
 
-    public ValidadorPorHora(LocalTime horaInicioPermitida, LocalTime horaFinPermitida) {
-        this.horaInicioPermitida = horaInicioPermitida;
-        this.horaFinPermitida = horaFinPermitida;
+    @Override
+    public boolean esValido(BloqueHorario a, BloqueHorario b) {
+        if (!a.getDia().equals(b.getDia())) return true;
+
+        LocalTime inicioA = a.getHoraInicio();
+        LocalTime finA = a.getHoraFin();
+        LocalTime inicioB = b.getHoraInicio();
+        LocalTime finB = b.getHoraFin();
+
+        // Traslape: A empieza antes de que termine B Y A termina despues de que empieza B
+        boolean seTraslapan = inicioA.isBefore(finB) && finA.isAfter(inicioB);
+        return !seTraslapan;
     }
 
     @Override
-    public boolean esValido(BloqueHorario bloqueA, BloqueHorario bloqueB) {
-        return bloqueA.getHoraInicio().compareTo(horaInicioPermitida) >= 0 &&
-               bloqueA.getHoraFin().compareTo(horaFinPermitida) <= 0 &&
-               bloqueB.getHoraInicio().compareTo(horaInicioPermitida) >= 0 &&
-               bloqueB.getHoraFin().compareTo(horaFinPermitida) <= 0;
-    }
-
-    @Override
-    public String getTipoConflicto(BloqueHorario bloqueA, BloqueHorario bloqueB) {
-        return "Conflicto de horario fuera del rango permitido: " +
-               horaInicioPermitida + " - " + horaFinPermitida;
+    public String getTipoConflicto() {
+        return "Conflicto de Horario (traslape de horas)";
     }
 }

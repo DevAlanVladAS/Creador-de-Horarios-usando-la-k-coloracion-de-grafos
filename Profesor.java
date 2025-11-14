@@ -4,10 +4,10 @@ import java.util.UUID;
 public class Profesor {
     private final String id = UUID.randomUUID().toString();
     private String nombre;
-    private String materiaAsignada; // Nuevo campo
-    // Lista de días e.g., ["Lunes","Martes"] (Ya existía)
+    private String materiaAsignada;
+    
     private List<String> diasDisponibles; 
-    // Lista de horas e.g., ["7:00", "8:00", "11:00"] (Nuevo campo)
+    
     private List<String> horasDisponibles; 
 
     public Profesor(String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles) {

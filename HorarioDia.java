@@ -1,13 +1,20 @@
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Representa un día específico dentro del horario semanal.
+ * Contiene una lista de bloques asignados a ese día.
+ *
+ * Este componente funciona dentro del patrón Composite.
+ */
 public class HorarioDia implements HorarioComponente {
+
     private String dia;
     private List<BloqueHorario> bloquesHorario;
 
     public HorarioDia(String dia) {
         this.dia = dia;
-        this.bloquesHorario = new ArrayList<BloqueHorario>();
+        this.bloquesHorario = new ArrayList<>();
     }
 
     public String getDia() {
@@ -19,41 +26,71 @@ public class HorarioDia implements HorarioComponente {
     }
 
     @Override
+    public List<BloqueHorario> getBloques() {
+        return bloquesHorario;
+    }
+
+
+    @Override
+    public void agregar(HorarioComponente comp) {
+        if (!(comp instanceof BloqueHorario)) {
+            throw new IllegalArgumentException("Solo se pueden agregar bloques horarios");
+        }
+
+        BloqueHorario bloque = (BloqueHorario) comp;
+
+
+        bloquesHorario.remove(bloque);
+
+       
+        validarNoTraslape(bloque);
+
+  
+        bloque.setDia(this.dia);
+
+
+        bloquesHorario.add(bloque);
+    }
+
+    @Override
+    public void eliminar(HorarioComponente comp) {
+        if (!(comp instanceof BloqueHorario)) {
+            throw new IllegalArgumentException("Solo se pueden eliminar bloques horarios");
+        }
+
+        BloqueHorario bloque = (BloqueHorario) comp;
+
+        boolean removed = bloquesHorario.remove(bloque);
+
+        if (removed) {
+            bloque.setDia(null);
+        }
+    }
+
+    @Override
     public void mostrarInfo() {
-        System.out.println("Horario del dia: " + dia);
+        System.out.println("Horario del día: " + dia);
         for (BloqueHorario bloque : bloquesHorario) {
             bloque.mostrarInfo();
         }
     }
 
-    @Override
-    public void agregar(HorarioComponente comp) {
-        if (comp instanceof BloqueHorario) {
-            BloqueHorario b = (BloqueHorario) comp;
-            // al agregar a un HorarioDia, asignamos el día al bloque (opcional)
-            b.setDia(this.dia);
-            bloquesHorario.add(b);
-        } else {
-            throw new IllegalArgumentException("Solo se pueden agregar BloqueHorario");
-        }
-    }
+ 
+    private void validarNoTraslape(BloqueHorario nuevo) {
+        for (BloqueHorario existente : bloquesHorario) {
 
-    @Override
-    public void eliminar(HorarioComponente comp) {
-        if (comp instanceof BloqueHorario) {
-            BloqueHorario b = (BloqueHorario) comp;
-            boolean removed = bloquesHorario.remove(b);
-            if (removed) {
-                // al quitar del día, desasignamos el campo dia del bloque
-                b.setDia(null);
+            if (existente == nuevo) continue;
+
+            boolean seTraslapan =
+                    !nuevo.getHoraFin().isBefore(existente.getHoraInicio()) &&
+                    !nuevo.getHoraInicio().isAfter(existente.getHoraFin());
+
+            if (seTraslapan) {
+                throw new IllegalArgumentException(
+                        "El bloque con ID " + nuevo.getId() +
+                        " se traslapa con otro bloque ya asignado en el día " + dia
+                );
             }
-        } else {
-            throw new IllegalArgumentException("Solo se pueden eliminar BloqueHorario");
         }
-    }
-
-    @Override
-    public List<BloqueHorario> getBloques() {
-        return bloquesHorario;
     }
 }

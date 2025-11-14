@@ -4,18 +4,35 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 
+/**
+ * Representa un conjunto de días de trabajo de la semana
+ * y los bloques horarios asignados o sin asignar.
+ *
+ * Esta clase funciona como "Composite" dentro del patrón Composite.
+ */
 public class HorarioSemana implements HorarioComponente {
-    // Permite obtener la lista de días de la semana
+
+    private List<HorarioDia> diasSemana;                     // Días (Lunes, Martes, ...)
+    private List<BloqueHorario> bloquesSinAsignar;           // Bloques aún no colocados
+    private Map<String, String> asignaciones;                // Mapa: ID bloque → día asignado
+
+    public HorarioSemana() {
+        this.diasSemana = new ArrayList<>();
+        this.bloquesSinAsignar = new ArrayList<>();
+        this.asignaciones = new HashMap<>();
+    }
+
+
     public List<HorarioDia> getDiasSemana() {
         return diasSemana;
     }
-    private List<HorarioDia> diasSemana;
-    private List<BloqueHorario> bloquesSinAsignar = new ArrayList<>();
-    // mapa de asignaciones: blockId -> dia
-    private Map<String, String> asignaciones = new HashMap<>();
 
-    public HorarioSemana() {
-        this.diasSemana = new ArrayList<HorarioDia>();
+    public List<BloqueHorario> getBloquesSinAsignar() {
+        return new ArrayList<>(bloquesSinAsignar);
+    }
+
+    public Optional<String> getDiaAsignado(String idBloque) {
+        return Optional.ofNullable(asignaciones.get(idBloque));
     }
 
     public void agregarDia(HorarioDia dia) {
@@ -25,91 +42,105 @@ public class HorarioSemana implements HorarioComponente {
     public void agregarBloqueEnDia(String dia, BloqueHorario bloque) {
         for (HorarioDia horarioDia : diasSemana) {
             if (horarioDia.getDia().equalsIgnoreCase(dia)) {
+                
+                horarioDia.eliminar(bloque);
+
                 horarioDia.agregar(bloque);
+
+                bloque.setDia(dia);
+
                 asignaciones.put(bloque.getId(), dia);
                 return;
             }
         }
-        throw new IllegalArgumentException("Dia no encontrado: " + dia);
+        throw new IllegalArgumentException("Día no encontrado: " + dia);
     }
 
     public void agregarBloqueSinAsignar(BloqueHorario bloque) {
-        bloquesSinAsignar.add(bloque);
-    }
-
-    public List<BloqueHorario> getBloquesSinAsignar() {
-        return new ArrayList<>(bloquesSinAsignar);
-    }
-
-    public void asignarBloquesSinAsignarADia(String dia) {
-        for (BloqueHorario bloque : new ArrayList<>(bloquesSinAsignar)) {
-            agregarBloqueEnDia(dia, bloque);
-            bloquesSinAsignar.remove(bloque);
+        if (!bloquesSinAsignar.contains(bloque)) {
+            bloquesSinAsignar.add(bloque);
         }
+        bloque.setDia(null);
+        asignaciones.remove(bloque.getId());
     }
 
-    // Buscar un bloque por id en la semana (dias + sin asignar)
-    public Optional<BloqueHorario> findBlockById(String id) {
-        for (HorarioDia dia : diasSemana) {
-            for (BloqueHorario b : dia.getBloques()) {
-                if (b.getId().equals(id)) return Optional.of(b);
-            }
+    public void asignarBloqueADia(String idBloque, String dia) {
+        Optional<BloqueHorario> contenedor = obtenerBloquePorID(idBloque);
+        if (contenedor.isEmpty()) {
+            throw new IllegalArgumentException("Bloque no encontrado: " + idBloque);
         }
-        for (BloqueHorario b : bloquesSinAsignar) {
-            if (b.getId().equals(id)) return Optional.of(b);
-        }
-        return Optional.empty();
-    }
 
-    // Asignar un bloque (por id) a un dia concreto. Actualiza las estructuras internas y el campo dia del bloque.
-    public void assignBlockToDay(String blockId, String dia) {
-        Optional<BloqueHorario> ob = findBlockById(blockId);
-        if (ob.isEmpty()) throw new IllegalArgumentException("Bloque no encontrado: " + blockId);
-        BloqueHorario b = ob.get();
-        // si ya estaba asignado a otro dia, remover de ese dia
-        String current = asignaciones.get(blockId);
-        if (current != null && current.equalsIgnoreCase(dia)) return; // ya asignado
-        if (current != null) {
-            // quitar del dia anterior
+        BloqueHorario bloque = contenedor.get();
+        String diaActual = asignaciones.get(idBloque);
+
+        if (diaActual != null && diaActual.equalsIgnoreCase(dia)) {
+            return;
+        }
+
+        if (diaActual != null) {
             for (HorarioDia hd : diasSemana) {
-                if (hd.getDia().equalsIgnoreCase(current)) {
-                    hd.eliminar(b);
+                if (hd.getDia().equalsIgnoreCase(diaActual)) {
+                    hd.eliminar(bloque);
                     break;
                 }
             }
         } else {
-            // si estaba en bloquesSinAsignar, remover
-            bloquesSinAsignar.remove(b);
+           
+            bloquesSinAsignar.remove(bloque);
         }
-        // agregar al dia destino
-        agregarBloqueEnDia(dia, b);
-        asignaciones.put(blockId, dia);
+
+        agregarBloqueEnDia(dia, bloque);
+
+        bloque.setDia(dia);
+        asignaciones.put(idBloque, dia);
     }
 
-    public void unassignBlock(String blockId) {
-        Optional<BloqueHorario> ob = findBlockById(blockId);
-        if (ob.isEmpty()) throw new IllegalArgumentException("Bloque no encontrado: " + blockId);
-        BloqueHorario b = ob.get();
-        String current = asignaciones.remove(blockId);
-        if (current != null) {
+    public void desasignarBloqueADia(String idBloque) {
+        Optional<BloqueHorario> contenedor = obtenerBloquePorID(idBloque);
+        if (contenedor.isEmpty()) {
+            throw new IllegalArgumentException("Bloque no encontrado: " + idBloque);
+        }
+
+        BloqueHorario bloque = contenedor.get();
+        String diaActual = asignaciones.remove(idBloque);
+
+        if (diaActual != null) {
             for (HorarioDia hd : diasSemana) {
-                if (hd.getDia().equalsIgnoreCase(current)) {
-                    hd.eliminar(b);
+                if (hd.getDia().equalsIgnoreCase(diaActual)) {
+                    hd.eliminar(bloque);
                     break;
                 }
             }
         }
-        // poner en sin asignar y desasignar el dia en el bloque
-        b.setDia(null);
-        if (!bloquesSinAsignar.contains(b)) bloquesSinAsignar.add(b);
+
+        bloque.setDia(null);
+
+        if (!bloquesSinAsignar.contains(bloque)) {
+            bloquesSinAsignar.add(bloque);
+        }
     }
 
-    public void moveBlock(String blockId, String diaDestino) {
-        assignBlockToDay(blockId, diaDestino);
+    public void moverBloque(String idBloque, String diaDestino) {
+        asignarBloqueADia(idBloque, diaDestino);
     }
 
-    public Optional<String> getAssignedDay(String blockId) {
-        return Optional.ofNullable(asignaciones.get(blockId));
+
+    public Optional<BloqueHorario> obtenerBloquePorID(String id) {
+        for (HorarioDia dia : diasSemana) {
+            for (BloqueHorario b : dia.getBloques()) {
+                if (b.getId().equals(id)) {
+                    return Optional.of(b);
+                }
+            }
+        }
+
+        for (BloqueHorario b : bloquesSinAsignar) {
+            if (b.getId().equals(id)) {
+                return Optional.of(b);
+            }
+        }
+
+        return Optional.empty();
     }
 
     @Override
@@ -126,32 +157,35 @@ public class HorarioSemana implements HorarioComponente {
     public void agregar(HorarioComponente comp) {
         if (comp instanceof HorarioDia) {
             diasSemana.add((HorarioDia) comp);
-        } else if (comp instanceof BloqueHorario) {
-            // Los bloques van a bloquesSinAsignar hasta que se especifique el dia y de eso se encarga los algoritmos de generacion o el usuario en la interfaz
-            agregarBloqueSinAsignar((BloqueHorario) comp);
-        } else {
-            throw new IllegalArgumentException("Tipo de componente invalido");
+            return;
         }
+        if (comp instanceof BloqueHorario) {
+            agregarBloqueSinAsignar((BloqueHorario) comp);
+            return;
+        }
+        throw new IllegalArgumentException("Tipo inválido: " + comp);
     }
 
     @Override
     public void eliminar(HorarioComponente comp) {
         if (comp instanceof HorarioDia) {
             diasSemana.remove((HorarioDia) comp);
-        } else if (comp instanceof BloqueHorario) {
-            bloquesSinAsignar.remove((BloqueHorario) comp);
-        } else {
-            throw new IllegalArgumentException("Tipo de componente invalido");
+            return;
         }
+        if (comp instanceof BloqueHorario) {
+            bloquesSinAsignar.remove((BloqueHorario) comp);
+            return;
+        }
+        throw new IllegalArgumentException("Tipo inválido: " + comp);
     }
 
     @Override
     public List<BloqueHorario> getBloques() {
-        List<BloqueHorario> todosLosBloques = new ArrayList<>();
+        List<BloqueHorario> todos = new ArrayList<>();
         for (HorarioDia dia : diasSemana) {
-            todosLosBloques.addAll(dia.getBloques());
+            todos.addAll(dia.getBloques());
         }
-        todosLosBloques.addAll(bloquesSinAsignar);
-        return todosLosBloques;
+        todos.addAll(bloquesSinAsignar);
+        return todos;
     }
 }
