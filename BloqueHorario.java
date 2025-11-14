@@ -162,5 +162,10 @@ class BloqueHorario implements HorarioComponente {
         this.grupoId = grupoId;
     }
 
+    public boolean seSolapaCon(BloqueHorario b2) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'seSolapaCon'");
+    }
+
 }
 

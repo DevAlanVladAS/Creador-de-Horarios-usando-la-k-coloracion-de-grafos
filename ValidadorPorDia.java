@@ -54,7 +54,7 @@ public class ValidadorPorDia implements Validador {
         String profesorId = bloque.getProfesorId();
         if (profesorId == null) return true; // Si no tiene id, permitir
         
-        Profesor p = catalogo.getProfesor(profesorId);
+        Profesor p = catalogo.obtenerProfesorPorId(profesorId );
         if (p == null) return false; // Profesor no encontrado
         
         return p.disponibleEn(dia);

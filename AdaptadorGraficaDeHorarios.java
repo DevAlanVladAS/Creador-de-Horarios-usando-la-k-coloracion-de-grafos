@@ -165,7 +165,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
             return true;
         }
 
-        Profesor p = catalogo.getProfesor(profesorId);
+        Profesor p = catalogo.obtenerProfesorPorId(profesorId);
         if (p == null) return false;
 
         return p.disponibleEn(diaAsignado);

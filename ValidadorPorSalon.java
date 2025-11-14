@@ -42,7 +42,7 @@ public class ValidadorPorSalon implements Validador {
         String salonId = bloque.getSalonId();
         if (salonId == null) return true; // Si no tiene id, permitir
         
-        Salon s = catalogo.getSalon(salonId);
+        Salon s = catalogo.obtenerSalonPorId(salonId);
         if (s == null) return false; // Salón no encontrado
         
         // Por ahora no implementamos disponibilidad de salones,
