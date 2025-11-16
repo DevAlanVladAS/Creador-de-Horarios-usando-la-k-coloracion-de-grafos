@@ -14,8 +14,8 @@ import java.awt.dnd.DragSource;
  */
 public class BloquePanel extends JPanel implements Transferable, DragGestureListener {
 
-    // DataFlavor personalizado para transferir este panel
-    public static final DataFlavor DATA_FLAVOR = new DataFlavor(BloquePanel.class, "BloquePanel");
+    // DataFlavor para transferir el objeto de modelo (BloqueHorario)
+    public static final DataFlavor DATA_FLAVOR = new DataFlavor(BloqueHorario.class, "BloqueHorario");
 
     private BloqueHorario bloque;
 
@@ -67,6 +67,9 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
 
     @Override
     public Object getTransferData(DataFlavor flavor) {
-        return this; // Transfiere la instancia de este panel
+        if (isDataFlavorSupported(flavor)) {
+            return bloque; // Transfiere el objeto de modelo, no el panel.
+        }
+        return null;
     }
 }

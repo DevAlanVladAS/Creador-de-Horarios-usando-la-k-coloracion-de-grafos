@@ -2,8 +2,10 @@ package src;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Vector;
 
 /**
@@ -19,19 +21,20 @@ public class PanelConfiguracion extends JPanel {
     // Componentes del formulario
     private JTextField txtNombreProfesor;
     private JTextField txtMateriaAsignada;
+    private JTextField txtHorasSemanales;
     private JCheckBox[] checkDias;
     private JCheckBox[] checkHoras;
+    private List<JCheckBox> checkGrupos;
     private JButton btnGuardarProfesor;
     private JButton btnSinPreferencias;
     
     // Componentes de la tabla de gestión
     private JTable tablaProfesores;
     private DefaultTableModel modeloTabla;
-    // Lista de grupos disponibles para asignar al guardar un profesor
-    private JList<String> listaGrupos;
-    private DefaultListModel<String> modeloListaGrupos;
-    // Dialogo padre (si existe) para operaciones de Guardar y Salir
-    private JDialog parentDialog;
+    private JDialog parentDialog; // Para cerrar el diálogo al guardar
+
+    // Estado de edición
+    private Profesor profesorEnEdicion = null;
 
     // Referencia al catálogo central
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance(); 
@@ -49,13 +52,12 @@ public class PanelConfiguracion extends JPanel {
         splitPane.setResizeWeight(0.6); 
         
         splitPane.setLeftComponent(crearPanelListadoProfesores());
-    splitPane.setRightComponent(crearPanelFormulario());
+        splitPane.setRightComponent(crearPanelFormulario());
         
         add(splitPane, BorderLayout.CENTER);
         
         // Cargar los datos existentes del catálogo al iniciar
         cargarDatosTabla();
-        refreshListaGrupos();
     }
     
     // ==========================================================
@@ -84,6 +86,7 @@ public class PanelConfiguracion extends JPanel {
         JButton btnEliminar = new JButton("Eliminar");
         
         btnEliminar.addActionListener(e -> eliminarProfesorSeleccionado());
+        btnEditar.addActionListener(e -> editarProfesorSeleccionado());
         
         panelAcciones.add(btnEditar);
         panelAcciones.add(btnEliminar);
@@ -116,57 +119,40 @@ public class PanelConfiguracion extends JPanel {
         txtMateriaAsignada = new JTextField(15);
         panelInputs.add(txtMateriaAsignada, gbc);
         
-        // 3. Disponibilidad por Días (Checkboxes)
+        // 3. Horas semanales
+        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0;
+        panelInputs.add(new JLabel("Horas por semana:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1;
+        txtHorasSemanales = new JTextField(5);
+        panelInputs.add(txtHorasSemanales, gbc);
+
+        // 4. Disponibilidad por Días (Checkboxes)
         JPanel panelDias = crearPanelDisponibilidad(DIAS_SEMANA, "Días Disponibles", checkDias -> this.checkDias = checkDias);
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weighty = 0;
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2; gbc.weighty = 0;
         panelInputs.add(panelDias, gbc);
         
-        // 4. Disponibilidad por Horas (Checkboxes)
+        // 5. Asignación de Grupos
+        JPanel panelGrupos = crearPanelGrupos();
+        gbc.gridy = 4;
+        panelInputs.add(panelGrupos, gbc);
+
+        // 6. Disponibilidad por Horas (Checkboxes)
         JPanel panelHoras = crearPanelDisponibilidad(HORAS_CLASE, "Horas Disponibles (7h-15h)", checkHoras -> this.checkHoras = checkHoras);
-        gbc.gridy = 3; gbc.weighty = 1; // Permite que este panel ocupe el espacio restante
+        gbc.gridy = 5; gbc.weighty = 1; // Permite que este panel ocupe el espacio restante
         panelInputs.add(panelHoras, gbc);
 
-    // 5. Grupos existentes (selección múltiple)
-    gbc.gridy = 4; gbc.gridwidth = 2; gbc.weighty = 0;
-    JPanel panelGrupos = new JPanel(new BorderLayout());
-    panelGrupos.setBorder(BorderFactory.createTitledBorder("Grupos existentes (seleccione para asignar)"));
-    modeloListaGrupos = new DefaultListModel<>();
-    listaGrupos = new JList<>(modeloListaGrupos);
-    listaGrupos.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-    panelGrupos.add(new JScrollPane(listaGrupos), BorderLayout.CENTER);
-    panelInputs.add(panelGrupos, gbc);
-        
         panelFormulario.add(panelInputs, BorderLayout.NORTH);
         
-        // 6. Botones de Acción (Guardar, Guardar y Salir, Salir, Sin Preferencias)
+        // 5. Botones de Acción (Guardar y Sin Preferencias)
         JPanel panelBotonesAccion = new JPanel(new FlowLayout(FlowLayout.CENTER));
         
         btnGuardarProfesor = new JButton("Guardar Profesor");
-        btnGuardarProfesor.addActionListener(e -> guardarProfesor(false));
-        
-        JButton btnGuardarYSalir = new JButton("Guardar y Salir");
-        btnGuardarYSalir.addActionListener(e -> guardarProfesor(true));
-
-        JButton btnSalir = new JButton("Salir");
-        btnSalir.addActionListener(e -> {
-            // Si hay datos en el formulario, confirmar pérdida de cambios
-            boolean hayDatos = !txtNombreProfesor.getText().trim().isEmpty() || !txtMateriaAsignada.getText().trim().isEmpty();
-            if (hayDatos) {
-                int r = JOptionPane.showConfirmDialog(this, "¿Seguro que quieres salir? Los cambios no guardados se borrarán.", "Confirmar salida", JOptionPane.YES_NO_OPTION);
-                if (r == JOptionPane.YES_OPTION && parentDialog != null) {
-                    parentDialog.dispose();
-                }
-            } else {
-                if (parentDialog != null) parentDialog.dispose();
-            }
-        });
+        btnGuardarProfesor.addActionListener(e -> guardarProfesor());
         
         btnSinPreferencias = new JButton("Sin Preferencias (Todo el Horario)");
         btnSinPreferencias.addActionListener(e -> setSinPreferencias());
         
         panelBotonesAccion.add(btnGuardarProfesor);
-        panelBotonesAccion.add(btnGuardarYSalir);
-        panelBotonesAccion.add(btnSalir);
         panelBotonesAccion.add(btnSinPreferencias);
         panelFormulario.add(panelBotonesAccion, BorderLayout.SOUTH);
 
@@ -184,6 +170,25 @@ public class PanelConfiguracion extends JPanel {
             panel.add(checks[i]);
         }
         setter.accept(checks); // Asigna los checks al campo de la clase (checkDias o checkHoras)
+        return panel;
+    }
+
+    private JPanel crearPanelGrupos() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Asignar a Grupos"));
+        checkGrupos = new ArrayList<>();
+
+        List<GrupoEstudiantes> grupos = catalogo.getTodosLosGrupos();
+        if (grupos.isEmpty()) {
+            panel.add(new JLabel("No hay grupos creados."));
+        } else {
+            for (GrupoEstudiantes grupo : grupos) {
+                JCheckBox check = new JCheckBox(grupo.getNombre());
+                check.putClientProperty("grupoId", grupo.getId()); // Guardar ID para referencia
+                checkGrupos.add(check);
+                panel.add(check);
+            }
+        }
         return panel;
     }
 
@@ -219,28 +224,22 @@ public class PanelConfiguracion extends JPanel {
             
             modeloTabla.addRow(row);
         }
-        // Actualizar lista de grupos en el formulario
-        refreshListaGrupos();
-    }
-
-    private void refreshListaGrupos() {
-        if (modeloListaGrupos == null) return;
-        modeloListaGrupos.clear();
-        for (GrupoEstudiantes g : catalogo.getTodosLosGrupos()) {
-            modeloListaGrupos.addElement(g.getNombre());
-        }
     }
 
     private void guardarProfesor() {
-        guardarProfesor(false);
-    }
-
-    private void guardarProfesor(boolean closeAfter) {
         String nombre = txtNombreProfesor.getText().trim();
         String materia = txtMateriaAsignada.getText().trim();
         
         if (nombre.isEmpty() || materia.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Debe ingresar el nombre y la materia del profesor.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        int horasSemanales;
+        try {
+            horasSemanales = Integer.parseInt(txtHorasSemanales.getText().trim());
+            if (horasSemanales <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Las horas por semana deben ser un número entero positivo.", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
         
@@ -258,45 +257,91 @@ public class PanelConfiguracion extends JPanel {
             }
         }
         
-        // Crear la instancia de Profesor con los nuevos campos
-        Profesor nuevoProfesor = new Profesor(nombre, materia, diasSeleccionados, horasSeleccionadas);
+        List<String> gruposSeleccionadosIds = checkGrupos.stream()
+            .filter(JCheckBox::isSelected)
+            .map(check -> (String) check.getClientProperty("grupoId"))
+            .collect(Collectors.toList());
 
-        // Añadir al catálogo central
-        catalogo.addProfesor(nuevoProfesor);
+        // --- VALIDACIÓN DE HORAS ---
+        // Cada bloque creado para un grupo cuenta como 1 hora.
+        int horasAsignadasPreviamente = 0;
+        if (profesorEnEdicion != null) {
+            // Al editar, no contamos los bloques que vamos a reemplazar.
+            // La validación se hace sobre el total de grupos seleccionados ahora.
+        }
+        int horasNuevas = gruposSeleccionadosIds.size();
+        if (horasAsignadasPreviamente + horasNuevas > horasSemanales) {
+            JOptionPane.showMessageDialog(this,
+                "Error: La asignación excede el límite de " + horasSemanales + " horas semanales del profesor.\n" +
+                "Horas actuales asignadas: " + horasAsignadasPreviamente + "\n" +
+                "Nuevas horas a asignar: " + horasNuevas,
+                "Límite de Horas Excedido", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        // --- FIN VALIDACIÓN ---
 
-        // Si se seleccionaron grupos, asignar el profesor a esos grupos
-        List<String> gruposSeleccionados = listaGrupos.getSelectedValuesList();
-        if (gruposSeleccionados != null && !gruposSeleccionados.isEmpty()) {
-            for (String nombreGrupo : gruposSeleccionados) {
-                GrupoEstudiantes grupo = catalogo.getTodosLosGrupos().stream()
-                    .filter(g -> g.getNombre().equals(nombreGrupo))
-                    .findFirst().orElse(null);
-                if (grupo != null) {
-                    grupo.addProfesor(nuevoProfesor.getId());
-                }
-            }
+        if (profesorEnEdicion == null) { // Creando un nuevo profesor
+            Profesor nuevoProfesor = new Profesor(nombre, materia, diasSeleccionados, horasSeleccionadas, horasSemanales);
+            catalogo.addProfesor(nuevoProfesor);
+            crearBloquesParaProfesor(nuevoProfesor, gruposSeleccionadosIds);
+            JOptionPane.showMessageDialog(this, "Profesor '" + nombre + "' guardado y añadido al catálogo.", "Guardado Exitoso", JOptionPane.INFORMATION_MESSAGE);
+        } else { // Editando un profesor existente
+            profesorEnEdicion.setNombre(nombre);
+            profesorEnEdicion.setMateriaAsignada(materia);
+            profesorEnEdicion.setHorasSemanales(horasSemanales);
+            profesorEnEdicion.setDiasDisponibles(diasSeleccionados);
+            profesorEnEdicion.setHorasDisponibles(horasSeleccionadas);
+            
+            // Actualizar bloques: eliminar los viejos y crear los nuevos
+            catalogo.removeBloquesByProfesorId(profesorEnEdicion.getId());
+            crearBloquesParaProfesor(profesorEnEdicion, gruposSeleccionadosIds);
+            JOptionPane.showMessageDialog(this, "Profesor '" + nombre + "' actualizado.", "Actualización Exitosa", JOptionPane.INFORMATION_MESSAGE);
         }
 
-        // Refrescar la tabla
-        cargarDatosTabla();
+        // Refrescar la tabla y limpiar
+        cargarDatosTabla(); 
+        limpiarFormulario();
 
-        // Limpiar formulario
-        txtNombreProfesor.setText("");
-        txtMateriaAsignada.setText("");
-        for (JCheckBox check : checkDias) { check.setSelected(true); }
-        for (JCheckBox check : checkHoras) { check.setSelected(true); }
-        listaGrupos.clearSelection();
-
-        JOptionPane.showMessageDialog(this,
-            "Profesor '" + nombre + "' guardado y añadido al catálogo central.",
-            "Guardado Exitoso",
-            JOptionPane.INFORMATION_MESSAGE);
-
-        if (closeAfter && parentDialog != null) {
+        // Cerrar el diálogo si está en uno
+        if (parentDialog != null) {
             parentDialog.dispose();
         }
     }
-    
+
+    private void limpiarFormulario() {
+        txtNombreProfesor.setText("");
+        txtMateriaAsignada.setText("");
+        txtHorasSemanales.setText("");
+        for (JCheckBox check : checkDias) { check.setSelected(true); }
+        for (JCheckBox check : checkHoras) { check.setSelected(true); }
+        for (JCheckBox check : checkGrupos) { check.setSelected(false); }
+        profesorEnEdicion = null; // Salir del modo edición
+    }
+
+    private void crearBloquesParaProfesor(Profesor profesor, List<String> grupoIds) {
+        Salon salonEjemplo = catalogo.getTodosLosSalones().stream().findFirst().orElse(null);
+        if (salonEjemplo == null) {
+            // Opcional: Crear un salón por defecto si no existe
+            salonEjemplo = new Salon("Salon General", 30);
+            catalogo.addSalon(salonEjemplo);
+        }
+
+        for (String grupoId : grupoIds) {
+            // Creamos un bloque de 1 hora, la hora de inicio es un placeholder
+            BloqueHorario bloque = new BloqueHorario(
+                LocalTime.of(7, 0), LocalTime.of(8, 0),
+                profesor.getMateriaAsignada(),
+                profesor.getId(),
+                salonEjemplo.getId(),
+                grupoId,
+                true
+            );
+            // Asignar un día por defecto para que aparezca en el horario
+            bloque.setDia("Lunes"); 
+            catalogo.addBloqueHorario(bloque);
+        }
+    }
+
     private void eliminarProfesorSeleccionado() {
         int filaSeleccionada = tablaProfesores.getSelectedRow();
         
@@ -315,6 +360,7 @@ public class PanelConfiguracion extends JPanel {
                 
                 if (profesorAEliminar != null) {
                     catalogo.removeProfesor(profesorAEliminar.getId());
+                    catalogo.removeBloquesByProfesorId(profesorAEliminar.getId()); // Eliminar sus bloques
                     cargarDatosTabla(); // Refrescar la tabla
                 }
             }
@@ -322,14 +368,43 @@ public class PanelConfiguracion extends JPanel {
             JOptionPane.showMessageDialog(this, "Por favor, seleccione un profesor de la tabla para eliminar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
         }
     }
-    
-    // Este método ya no es necesario ya que los datos se almacenan en el Singleton,
-    // pero lo dejamos para compatibilidad si la InterfazGrafica lo requiere.
-    public List<Profesor> getProfesoresCreados() {
-        return catalogo.getTodosLosProfesores();
+
+    private void editarProfesorSeleccionado() {
+        int filaSeleccionada = tablaProfesores.getSelectedRow();
+        if (filaSeleccionada < 0) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un profesor de la tabla para editar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String nombreProf = (String) modeloTabla.getValueAt(filaSeleccionada, 0);
+        profesorEnEdicion = catalogo.findProfesorByName(nombreProf).orElse(null);
+
+        if (profesorEnEdicion != null) {
+            // Cargar datos en el formulario
+            txtNombreProfesor.setText(profesorEnEdicion.getNombre());
+            txtMateriaAsignada.setText(profesorEnEdicion.getMateriaAsignada());
+            txtHorasSemanales.setText(String.valueOf(profesorEnEdicion.getHorasSemanales()));
+
+            // Marcar disponibilidad de días y horas
+            List<String> diasDisp = profesorEnEdicion.getDiasDisponibles();
+            for (JCheckBox check : checkDias) {
+                check.setSelected(diasDisp.contains(check.getText()));
+            }
+            List<String> horasDisp = profesorEnEdicion.getHorasDisponibles();
+            for (JCheckBox check : checkHoras) {
+                check.setSelected(horasDisp.contains(check.getText()));
+            }
+
+            // Marcar grupos asignados
+            List<String> gruposAsignadosIds = catalogo.getBloquesByProfesorId(profesorEnEdicion.getId())
+                .stream().map(BloqueHorario::getGrupoId).distinct().collect(Collectors.toList());
+            for (JCheckBox check : checkGrupos) {
+                String grupoId = (String) check.getClientProperty("grupoId");
+                check.setSelected(gruposAsignadosIds.contains(grupoId));
+            }
+        }
     }
 
-    /** Si este panel se muestra en un JDialog, asignarlo para poder cerrarlo desde los botones. */
     public void setParentDialog(JDialog dialog) {
         this.parentDialog = dialog;
     }
