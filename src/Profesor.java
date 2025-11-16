@@ -10,12 +10,14 @@ public class Profesor {
     private List<String> diasDisponibles; 
     
     private List<String> horasDisponibles; 
+    private int horasSemanales; // Total de horas a trabajar a la semana
 
-    public Profesor(String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles) {
+    public Profesor(String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles, int horasSemanales) {
         this.nombre = nombre;
         this.materiaAsignada = materiaAsignada;
         this.diasDisponibles = diasDisponibles;
         this.horasDisponibles = horasDisponibles;
+        this.horasSemanales = horasSemanales;
     }
 
     public String getId() { return id; }
@@ -23,11 +25,13 @@ public class Profesor {
     public String getMateriaAsignada() { return materiaAsignada; }
     public List<String> getDiasDisponibles() { return diasDisponibles; }
     public List<String> getHorasDisponibles() { return horasDisponibles; }
+    public int getHorasSemanales() { return horasSemanales; }
     
     public void setNombre(String nombre) { this.nombre = nombre; }
     public void setMateriaAsignada(String materiaAsignada) { this.materiaAsignada = materiaAsignada; }
     public void setDiasDisponibles(List<String> diasDisponibles) { this.diasDisponibles = diasDisponibles; }
     public void setHorasDisponibles(List<String> horasDisponibles) { this.horasDisponibles = horasDisponibles; }
+    public void setHorasSemanales(int horasSemanales) { this.horasSemanales = horasSemanales; }
 
     public boolean disponibleEn(String dia) {
         return diasDisponibles == null || diasDisponibles.isEmpty() || diasDisponibles.contains(dia);

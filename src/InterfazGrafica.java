@@ -3,6 +3,9 @@ package src;
 
 import java.awt.*;
 import javax.swing.*;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * InterfazGrafica: Contenedor principal del JFrame.
@@ -65,6 +68,11 @@ public class InterfazGrafica extends JFrame {
     /** Agrega una nueva pestaña con un PanelHorario para un grupo específico. */
     private void agregarPestanaHorario(GrupoEstudiantes grupo) {
         PanelHorario nuevoHorario = new PanelHorario();
+
+        // Cargar los bloques que pertenecen a este grupo desde el catálogo central
+        List<BloqueHorario> bloquesDelGrupo = catalogo.getBloquesByGrupoId(grupo.getId());
+        nuevoHorario.cargarBloques(bloquesDelGrupo);
+
         tabbedPanelHorarios.addTab(grupo.getNombre(), nuevoHorario);
     }
 
@@ -166,6 +174,9 @@ public class InterfazGrafica extends JFrame {
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+
+        // Al cerrar el diálogo de configuración, refrescar los horarios por si hubo cambios
+        cargarPestanasDeGrupos();
     }
 
     private void initComponents() {

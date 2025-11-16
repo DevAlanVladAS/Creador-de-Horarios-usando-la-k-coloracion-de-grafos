@@ -11,7 +11,7 @@ import java.util.UUID;
  *
  * Es una hoja dentro del patrón Composite.
  */
-public class BloqueHorario implements HorarioComponente {
+public class BloqueHorario implements HorarioComponente, java.io.Serializable {
 
     private LocalTime horaInicio;
     private LocalTime horaFin;
