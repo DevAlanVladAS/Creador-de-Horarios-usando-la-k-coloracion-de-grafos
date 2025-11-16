@@ -9,7 +9,7 @@ import java.util.ArrayList;
 public class CatalogoRecursos {
     
     // 1. Instancia Singleton
-    private static CatalogoRecursos instance;
+    private static volatile CatalogoRecursos instance;
     
     // 2. Colecciones (Usando Map para un acceso rápido por ID)
     private final Map<String, Profesor> profesores = new ConcurrentHashMap<>();
@@ -17,7 +17,7 @@ public class CatalogoRecursos {
     private final Map<String, GrupoEstudiantes> grupos = new ConcurrentHashMap<>();
 
     // 3. Constructor privado para evitar instanciación externa
-    CatalogoRecursos() {
+    private CatalogoRecursos() {
         // Inicializar con algunos datos de ejemplo si es necesario
         // Pero lo dejaremos vacío para que el director cree todo.
     }
@@ -25,7 +25,11 @@ public class CatalogoRecursos {
     // 4. Método de acceso global
     public static CatalogoRecursos getInstance() {
         if (instance == null) {
-            instance = new CatalogoRecursos();
+            synchronized (CatalogoRecursos.class) {
+                if (instance == null) {
+                    instance = new CatalogoRecursos();
+                }
+            }
         }
         return instance;
     }
@@ -63,13 +67,22 @@ public class CatalogoRecursos {
         grupos.clear();
     }
 
-    public Object findProfesorByName(String nombre) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findProfesorByName'");
+    public Optional<Profesor> findProfesorByName(String nombre) {
+        return profesores.values().stream()
+                .filter(p -> p.getNombre().equalsIgnoreCase(nombre))
+                .findFirst();
     }
 
-    public Object findGrupoByName(String nombre) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findGrupoByName'");
+    public Optional<GrupoEstudiantes> findGrupoByName(String nombre) {
+        return grupos.values().stream()
+                .filter(g -> g.getNombre().equalsIgnoreCase(nombre))
+                .findFirst();
     }
+
+    public Optional<Salon> findSalonByName(String nombre) {
+        return salones.values().stream()
+                .filter(s -> s.getNombre().equalsIgnoreCase(nombre))
+                .findFirst();
+    }
+
 }
