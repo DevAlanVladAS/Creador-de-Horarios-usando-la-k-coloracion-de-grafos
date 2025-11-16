@@ -16,7 +16,7 @@ public class PanelHorario extends JPanel {
     private final String[] HORAS_DIA = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"};
     private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
 
-    public PanelHorario(String grupoId) {
+    public PanelHorario() {
         this.grupoId = grupoId;
         setLayout(new BorderLayout(10, 10));
         
@@ -49,23 +49,14 @@ public class PanelHorario extends JPanel {
     private void simularCargaHorario() {
         // Simulación: Añadir un bloque de ejemplo al catálogo
         CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
-        if (catalogo.getTodosLosProfesores().isEmpty()) {
-            catalogo.addProfesor(new Profesor("Prof. Simulado", "Algebra", List.of("Lunes"), List.of("7:00")));
-        }
         Profesor p = catalogo.getTodosLosProfesores().get(0);
-        
-        BloqueHorario bloqueSimulado = new BloqueHorario(
-            LocalTime.of(7, 0), LocalTime.of(8, 0),
-            p.getMateriaAsignada(), p.getId(), "A1", grupoId, false
-        );
-        bloqueSimulado.setDia("Lunes"); // Asignar día
+    
 
         // Buscar la celda "Lunes" a las "7:00" y añadir el panel
         for (Component comp : ((JPanel) ((JScrollPane) getComponent(0)).getViewport().getView()).getComponents()) {
             if (comp instanceof CeldaHorario) {
                 CeldaHorario celda = (CeldaHorario) comp;
                 if (celda.dia.equals("Lunes") && celda.hora.equals("7:00")) {
-                    celda.add(new BloquePanel(bloqueSimulado));
                     break;
                 }
             }
