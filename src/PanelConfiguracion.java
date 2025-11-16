@@ -336,8 +336,7 @@ public class PanelConfiguracion extends JPanel {
                 grupoId,
                 true
             );
-            // Asignar un día por defecto para que aparezca en el horario
-            bloque.setDia("Lunes"); 
+ 
             catalogo.addBloqueHorario(bloque);
         }
     }

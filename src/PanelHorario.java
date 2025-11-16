@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
- * Panel que muestra la cuadrícula del horario de un Grupo.
+ * Panel que muestra la cuadr��cula del horario de un Grupo.
  * Implementa Drag-and-Drop para los BloquePanel.
  */
 public class PanelHorario extends JPanel {
@@ -27,19 +27,20 @@ public class PanelHorario extends JPanel {
         LocalTime.of(14, 0),
         LocalTime.of(15, 0)
     };
-    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
+    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "MiǸrcoles", "Jueves", "Viernes"};
+    private final JPanel gridPanel;
+    private final PanelSinAsignar panelSinAsignar;
 
     public PanelHorario() {
         this.grupoId = grupoId;
         setLayout(new BorderLayout(10, 10));
         
-        // Layout de Cuadrícula: 10 filas (9 horas + 1 cabecera) x 6 cols (5 dias + 1 cabecera)
-        JPanel gridPanel = new JPanel(new GridLayout(HORAS_DIA.length + 1, DIAS_SEMANA.length + 1));
+        gridPanel = new JPanel(new GridLayout(HORAS_DIA.length + 1, DIAS_SEMANA.length + 1));
         
-        // 1. Esquina vacía
+        // 1. Esquina vac��a
         gridPanel.add(new JLabel("")); 
         
-        // 2. Cabecera Días
+        // 2. Cabecera D��as
         for (String dia : DIAS_SEMANA) {
             gridPanel.add(crearCeldaCabecera(dia));
         }
@@ -48,17 +49,27 @@ public class PanelHorario extends JPanel {
         for (LocalTime hora : HORAS_DIA) {
             gridPanel.add(crearCeldaCabecera(formatearHora(hora))); // Cabecera de Hora
             for (String dia : DIAS_SEMANA) {
-                // Celda que acepta el Drop
                 gridPanel.add(new CeldaHorario(dia, hora, this)); 
             }
         }
         
         add(new JScrollPane(gridPanel), BorderLayout.CENTER);
+
+        panelSinAsignar = new PanelSinAsignar();
+        JScrollPane scrollSinAsignar = new JScrollPane(panelSinAsignar);
+        scrollSinAsignar.setBorder(BorderFactory.createEmptyBorder());
+        scrollSinAsignar.setPreferredSize(new Dimension(240, 0));
+
+        JPanel contenedorSinAsignar = new JPanel(new BorderLayout(5, 5));
+        contenedorSinAsignar.setBorder(BorderFactory.createTitledBorder("Bloques sin asignar"));
+        contenedorSinAsignar.add(scrollSinAsignar, BorderLayout.CENTER);
+
+        add(contenedorSinAsignar, BorderLayout.EAST);
     }
     
     /**
-     * Busca una celda específica en la cuadrícula por día y hora.
-     * @param dia El día de la semana (e.g., "Lunes").
+     * Busca una celda espec��fica en la cuadr��cula por d��a y hora.
+     * @param dia El d��a de la semana (e.g., "Lunes").
      * @param hora La hora en formato "HH:mm" (e.g., "07:00").
      * @return La CeldaHorario correspondiente, o null si no se encuentra.
      */
@@ -66,7 +77,7 @@ public class PanelHorario extends JPanel {
         if (dia == null || hora == null) {
             return null;
         }
-        for (Component comp : ((JPanel) ((JScrollPane) getComponent(0)).getViewport().getView()).getComponents()) {
+        for (Component comp : gridPanel.getComponents()) {
             if (comp instanceof CeldaHorario) {
                 CeldaHorario celda = (CeldaHorario) comp;
                 if (celda.dia.equalsIgnoreCase(dia) && celda.hora.equals(hora)) {
@@ -78,24 +89,47 @@ public class PanelHorario extends JPanel {
     }
 
     /**
-     * Carga una lista de bloques en el panel del horario, colocándolos en sus celdas correspondientes.
-     * Este método reemplaza la simulación y permite cargar datos reales.
+     * Carga una lista de bloques en el panel del horario, colocǭndolos en sus celdas correspondientes.
+     * Este mǸtodo reemplaza la simulaci��n y permite cargar datos reales.
      * @param bloques La lista de BloqueHorario a mostrar.
      */
     public void cargarBloques(List<BloqueHorario> bloques) {
+        limpiarCeldasHorario();
+        panelSinAsignar.resetContenido();
+
         for (BloqueHorario bloque : bloques) {
             LocalTime horaInicio = bloque.getHoraInicio();
-            if (horaInicio == null) {
-                continue;
+            LocalTime horaNormalizada = horaInicio != null ? horaInicio.withSecond(0).withNano(0) : null;
+
+            if (bloque.getDia() != null && horaNormalizada != null) {
+                CeldaHorario celda = getCelda(bloque.getDia(), horaNormalizada);
+                if (celda != null) {
+                    celda.add(new BloquePanel(bloque), BorderLayout.CENTER);
+                    continue;
+                }
             }
-            horaInicio = horaInicio.withSecond(0).withNano(0);
-            CeldaHorario celda = getCelda(bloque.getDia(), horaInicio);
-            if (celda != null) {
-                celda.add(new BloquePanel(bloque), BorderLayout.CENTER);
-            }
+
+            agregarBloqueSinAsignar(bloque);
         }
+
+        panelSinAsignar.actualizarEstadoVacio();
         revalidate();
         repaint();
+    }
+
+    private void limpiarCeldasHorario() {
+        for (Component comp : gridPanel.getComponents()) {
+            if (comp instanceof CeldaHorario) {
+                ((CeldaHorario) comp).removeAll();
+            }
+        }
+    }
+
+    private void agregarBloqueSinAsignar(BloqueHorario bloque) {
+        BloquePanel panel = new BloquePanel(bloque);
+        panel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+        panelSinAsignar.addBloquePanel(panel);
     }
 
     private JLabel crearCeldaCabecera(String texto) {
@@ -107,8 +141,27 @@ public class PanelHorario extends JPanel {
         return label;
     }
 
+    private BloquePanel findBloquePanelById(String id) {
+        for (Component comp : gridPanel.getComponents()) {
+            if (comp instanceof CeldaHorario) {
+                CeldaHorario celda = (CeldaHorario) comp;
+                if (celda.getComponentCount() > 0 && celda.getComponent(0) instanceof BloquePanel) {
+                    BloquePanel panel = (BloquePanel) celda.getComponent(0);
+                    if (panel.getBloque().getId().equals(id)) return panel;
+                }
+            }
+        }
+        for (Component comp : panelSinAsignar.getComponents()) {
+            if (comp instanceof BloquePanel) {
+                BloquePanel panel = (BloquePanel) comp;
+                if (panel.getBloque().getId().equals(id)) return panel;
+            }
+        }
+        return null;
+    }
+
     /**
-     * Celda individual de la cuadrícula que acepta Drops.
+     * Celda individual de la cuadr��cula que acepta Drops.
      */
     private class CeldaHorario extends JPanel implements DropTargetListener {
         
@@ -125,8 +178,6 @@ public class PanelHorario extends JPanel {
             new DropTarget(this, DnDConstants.ACTION_MOVE, this, true);
         }
 
-        // --- Métodos de DropTargetListener ---
-        
         @Override
         public void drop(DropTargetDropEvent dtde) {
             try {
@@ -135,36 +186,28 @@ public class PanelHorario extends JPanel {
                     dtde.acceptDrop(DnDConstants.ACTION_MOVE);
                     
                     BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
-                    
-                    // Buscar el componente BloquePanel correspondiente al BloqueHorario
                     BloquePanel bloquePanel = findBloquePanelById(bloqueTransferido.getId());
 
                     if (bloquePanel == null) {
-                        // No se encontró el panel, algo salió mal.
-                        // Esto podría pasar si el panel no está visible o ya fue removido.
-                        System.err.println("Error: No se encontró el BloquePanel para el ID: " + bloqueTransferido.getId());
                         dtde.rejectDrop();
                         return;
                     }
 
-                    // --- LÓGICA DE MOVIMIENTO ---
-                    // 1. Quitar del panel anterior
                     Container oldParent = bloquePanel.getParent();
                     if (oldParent != null) {
                         oldParent.remove(bloquePanel);
                         oldParent.revalidate();
                         oldParent.repaint();
+                        if (oldParent instanceof PanelSinAsignar) {
+                            ((PanelSinAsignar) oldParent).actualizarEstadoVacio();
+                        }
                     }
                     
-                    // 2. Añadir al nuevo panel (esta celda)
                     this.removeAll(); // Solo un bloque por celda
                     this.add(bloquePanel, BorderLayout.CENTER);
                     
-                    // 3. Actualizar el Modelo (BloqueHorario)
-                    // Actualiza el día
                     bloqueTransferido.setDia(this.dia);
                     
-                    // Actualiza la hora, conservando la duración del bloque
                     LocalTime nuevaHoraInicio = this.hora;
                     Duration duracion = bloqueTransferido.getDuracion();
                     bloqueTransferido.setHoraInicio(nuevaHoraInicio);
@@ -179,37 +222,115 @@ public class PanelHorario extends JPanel {
             } catch (Exception e) {
                 e.printStackTrace();
                 dtde.rejectDrop();
+            } finally {
+                setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
             }
         }
 
-        /**
-         * Busca recursivamente en el PanelHorario un BloquePanel que coincida con el ID del BloqueHorario.
-         */
-        private BloquePanel findBloquePanelById(String id) {
-            for (Component comp : ((JPanel) ((JScrollPane) panelHorarioPadre.getComponent(0)).getViewport().getView()).getComponents()) {
-                if (comp instanceof CeldaHorario) {
-                    CeldaHorario celda = (CeldaHorario) comp;
-                    if (celda.getComponentCount() > 0 && celda.getComponent(0) instanceof BloquePanel) {
-                        BloquePanel panel = (BloquePanel) celda.getComponent(0);
-                        if (panel.getBloque().getId().equals(id)) return panel;
-                    }
-                }
-            }
-            return null; // No encontrado
-        }
-        
-        // (Otros métodos de DropTargetListener: dragEnter, dragOver, dragExit, dropActionChanged)
         @Override public void dragEnter(DropTargetDragEvent dtde) {
-            setBorder(BorderFactory.createLineBorder(Color.BLUE, 2)); // Resaltar al entrar
+            setBorder(BorderFactory.createLineBorder(Color.BLUE, 2));
         }
         @Override public void dragOver(DropTargetDragEvent dtde) {}
         @Override public void dragExit(DropTargetEvent dte) {
-            setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY)); // Quitar resaltado
+            setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
         }
         @Override public void dropActionChanged(DropTargetDragEvent dtde) {}
     }
     
     private String formatearHora(LocalTime hora) {
         return hora.format(HORA_FORMATTER);
+    }
+
+    private class PanelSinAsignar extends JPanel implements DropTargetListener {
+        private final JLabel lblEmpty;
+
+        public PanelSinAsignar() {
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            setBackground(new Color(248, 248, 248));
+            setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            lblEmpty = new JLabel("Arrastra aquí los bloques pendientes", SwingConstants.CENTER);
+            lblEmpty.setAlignmentX(Component.CENTER_ALIGNMENT);
+            add(lblEmpty);
+            new DropTarget(this, DnDConstants.ACTION_MOVE, this, true);
+        }
+
+        void resetContenido() {
+            removeAll();
+            add(lblEmpty);
+            revalidate();
+            repaint();
+        }
+
+        void addBloquePanel(BloquePanel panel) {
+            if (lblEmpty.getParent() == this) {
+                remove(lblEmpty);
+            }
+            panel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            add(panel);
+            revalidate();
+            repaint();
+        }
+
+        void actualizarEstadoVacio() {
+            boolean hayBloques = false;
+            for (Component comp : getComponents()) {
+                if (comp instanceof BloquePanel) {
+                    hayBloques = true;
+                    break;
+                }
+            }
+            if (!hayBloques && lblEmpty.getParent() != this) {
+                add(lblEmpty);
+            } else if (hayBloques && lblEmpty.getParent() == this) {
+                remove(lblEmpty);
+            }
+            lblEmpty.setVisible(!hayBloques);
+            revalidate();
+            repaint();
+        }
+
+        @Override
+        public void drop(DropTargetDropEvent dtde) {
+            try {
+                Transferable tr = dtde.getTransferable();
+                if (tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
+                    dtde.acceptDrop(DnDConstants.ACTION_MOVE);
+                    BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
+                    BloquePanel bloquePanel = findBloquePanelById(bloqueTransferido.getId());
+                    if (bloquePanel == null) {
+                        dtde.rejectDrop();
+                        return;
+                    }
+                    Container oldParent = bloquePanel.getParent();
+                    if (oldParent != null) {
+                        oldParent.remove(bloquePanel);
+                        oldParent.revalidate();
+                        oldParent.repaint();
+                    }
+                    bloqueTransferido.setDia(null);
+                    addBloquePanel(bloquePanel);
+                    actualizarEstadoVacio();
+                    dtde.dropComplete(true);
+                } else {
+                    dtde.rejectDrop();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                dtde.rejectDrop();
+            } finally {
+                setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            }
+        }
+
+        @Override public void dragEnter(DropTargetDragEvent dtde) {
+            setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.BLUE, 2),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+        }
+        @Override public void dragOver(DropTargetDragEvent dtde) {}
+        @Override public void dragExit(DropTargetEvent dte) {
+            setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        }
+        @Override public void dropActionChanged(DropTargetDragEvent dtde) {}
     }
 }
