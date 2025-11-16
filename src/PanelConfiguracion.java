@@ -27,6 +27,11 @@ public class PanelConfiguracion extends JPanel {
     // Componentes de la tabla de gestión
     private JTable tablaProfesores;
     private DefaultTableModel modeloTabla;
+    // Lista de grupos disponibles para asignar al guardar un profesor
+    private JList<String> listaGrupos;
+    private DefaultListModel<String> modeloListaGrupos;
+    // Dialogo padre (si existe) para operaciones de Guardar y Salir
+    private JDialog parentDialog;
 
     // Referencia al catálogo central
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance(); 
@@ -44,12 +49,13 @@ public class PanelConfiguracion extends JPanel {
         splitPane.setResizeWeight(0.6); 
         
         splitPane.setLeftComponent(crearPanelListadoProfesores());
-        splitPane.setRightComponent(crearPanelFormulario());
+    splitPane.setRightComponent(crearPanelFormulario());
         
         add(splitPane, BorderLayout.CENTER);
         
         // Cargar los datos existentes del catálogo al iniciar
         cargarDatosTabla();
+        refreshListaGrupos();
     }
     
     // ==========================================================
@@ -119,19 +125,48 @@ public class PanelConfiguracion extends JPanel {
         JPanel panelHoras = crearPanelDisponibilidad(HORAS_CLASE, "Horas Disponibles (7h-15h)", checkHoras -> this.checkHoras = checkHoras);
         gbc.gridy = 3; gbc.weighty = 1; // Permite que este panel ocupe el espacio restante
         panelInputs.add(panelHoras, gbc);
+
+    // 5. Grupos existentes (selección múltiple)
+    gbc.gridy = 4; gbc.gridwidth = 2; gbc.weighty = 0;
+    JPanel panelGrupos = new JPanel(new BorderLayout());
+    panelGrupos.setBorder(BorderFactory.createTitledBorder("Grupos existentes (seleccione para asignar)"));
+    modeloListaGrupos = new DefaultListModel<>();
+    listaGrupos = new JList<>(modeloListaGrupos);
+    listaGrupos.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+    panelGrupos.add(new JScrollPane(listaGrupos), BorderLayout.CENTER);
+    panelInputs.add(panelGrupos, gbc);
         
         panelFormulario.add(panelInputs, BorderLayout.NORTH);
         
-        // 5. Botones de Acción (Guardar y Sin Preferencias)
+        // 6. Botones de Acción (Guardar, Guardar y Salir, Salir, Sin Preferencias)
         JPanel panelBotonesAccion = new JPanel(new FlowLayout(FlowLayout.CENTER));
         
         btnGuardarProfesor = new JButton("Guardar Profesor");
-        btnGuardarProfesor.addActionListener(e -> guardarProfesor());
+        btnGuardarProfesor.addActionListener(e -> guardarProfesor(false));
+        
+        JButton btnGuardarYSalir = new JButton("Guardar y Salir");
+        btnGuardarYSalir.addActionListener(e -> guardarProfesor(true));
+
+        JButton btnSalir = new JButton("Salir");
+        btnSalir.addActionListener(e -> {
+            // Si hay datos en el formulario, confirmar pérdida de cambios
+            boolean hayDatos = !txtNombreProfesor.getText().trim().isEmpty() || !txtMateriaAsignada.getText().trim().isEmpty();
+            if (hayDatos) {
+                int r = JOptionPane.showConfirmDialog(this, "¿Seguro que quieres salir? Los cambios no guardados se borrarán.", "Confirmar salida", JOptionPane.YES_NO_OPTION);
+                if (r == JOptionPane.YES_OPTION && parentDialog != null) {
+                    parentDialog.dispose();
+                }
+            } else {
+                if (parentDialog != null) parentDialog.dispose();
+            }
+        });
         
         btnSinPreferencias = new JButton("Sin Preferencias (Todo el Horario)");
         btnSinPreferencias.addActionListener(e -> setSinPreferencias());
         
         panelBotonesAccion.add(btnGuardarProfesor);
+        panelBotonesAccion.add(btnGuardarYSalir);
+        panelBotonesAccion.add(btnSalir);
         panelBotonesAccion.add(btnSinPreferencias);
         panelFormulario.add(panelBotonesAccion, BorderLayout.SOUTH);
 
@@ -184,9 +219,23 @@ public class PanelConfiguracion extends JPanel {
             
             modeloTabla.addRow(row);
         }
+        // Actualizar lista de grupos en el formulario
+        refreshListaGrupos();
+    }
+
+    private void refreshListaGrupos() {
+        if (modeloListaGrupos == null) return;
+        modeloListaGrupos.clear();
+        for (GrupoEstudiantes g : catalogo.getTodosLosGrupos()) {
+            modeloListaGrupos.addElement(g.getNombre());
+        }
     }
 
     private void guardarProfesor() {
+        guardarProfesor(false);
+    }
+
+    private void guardarProfesor(boolean closeAfter) {
         String nombre = txtNombreProfesor.getText().trim();
         String materia = txtMateriaAsignada.getText().trim();
         
@@ -211,23 +260,41 @@ public class PanelConfiguracion extends JPanel {
         
         // Crear la instancia de Profesor con los nuevos campos
         Profesor nuevoProfesor = new Profesor(nombre, materia, diasSeleccionados, horasSeleccionadas);
-        
+
         // Añadir al catálogo central
-        catalogo.addProfesor(nuevoProfesor); 
-        
+        catalogo.addProfesor(nuevoProfesor);
+
+        // Si se seleccionaron grupos, asignar el profesor a esos grupos
+        List<String> gruposSeleccionados = listaGrupos.getSelectedValuesList();
+        if (gruposSeleccionados != null && !gruposSeleccionados.isEmpty()) {
+            for (String nombreGrupo : gruposSeleccionados) {
+                GrupoEstudiantes grupo = catalogo.getTodosLosGrupos().stream()
+                    .filter(g -> g.getNombre().equals(nombreGrupo))
+                    .findFirst().orElse(null);
+                if (grupo != null) {
+                    grupo.addProfesor(nuevoProfesor.getId());
+                }
+            }
+        }
+
         // Refrescar la tabla
-        cargarDatosTabla(); 
+        cargarDatosTabla();
 
         // Limpiar formulario
         txtNombreProfesor.setText("");
         txtMateriaAsignada.setText("");
         for (JCheckBox check : checkDias) { check.setSelected(true); }
         for (JCheckBox check : checkHoras) { check.setSelected(true); }
-        
-        JOptionPane.showMessageDialog(this, 
-            "Profesor '" + nombre + "' guardado y añadido al catálogo central.", 
-            "Guardado Exitoso", 
+        listaGrupos.clearSelection();
+
+        JOptionPane.showMessageDialog(this,
+            "Profesor '" + nombre + "' guardado y añadido al catálogo central.",
+            "Guardado Exitoso",
             JOptionPane.INFORMATION_MESSAGE);
+
+        if (closeAfter && parentDialog != null) {
+            parentDialog.dispose();
+        }
     }
     
     private void eliminarProfesorSeleccionado() {
@@ -260,5 +327,10 @@ public class PanelConfiguracion extends JPanel {
     // pero lo dejamos para compatibilidad si la InterfazGrafica lo requiere.
     public List<Profesor> getProfesoresCreados() {
         return catalogo.getTodosLosProfesores();
+    }
+
+    /** Si este panel se muestra en un JDialog, asignarlo para poder cerrarlo desde los botones. */
+    public void setParentDialog(JDialog dialog) {
+        this.parentDialog = dialog;
     }
 }

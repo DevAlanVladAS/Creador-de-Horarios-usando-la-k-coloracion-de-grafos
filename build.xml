@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="CreadorHorarios" default="test" basedir=".">
+<project name="CreadorHorarios" default="compile" basedir=".">
     <description>
         Sistema de Creación de Horarios usando k-coloración de grafos
     </description>

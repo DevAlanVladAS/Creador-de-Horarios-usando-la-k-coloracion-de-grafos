@@ -75,6 +75,10 @@ public class BloqueHorario implements HorarioComponente {
     }
 
 
+    public BloqueHorario(String string, String string2, String string3, String string4, String string5) {
+        //TODO Auto-generated constructor stub
+    }
+
     @Override
     public void mostrarInfo() {
         String diaStr = (dia == null) ? "(sin asignar)" : dia;
@@ -106,10 +110,12 @@ public class BloqueHorario implements HorarioComponente {
     public LocalTime getHoraFin() { return horaFin; }
 
     public void setHoraInicio(LocalTime horaInicio) {
+        validarIntervalo(horaInicio, this.horaFin);
         this.horaInicio = horaInicio;
     }
 
     public void setHoraFin(LocalTime horaFin) {
+        validarIntervalo(this.horaInicio, horaFin);
         this.horaFin = horaFin;
     }
 
@@ -143,17 +149,6 @@ public class BloqueHorario implements HorarioComponente {
     public String getGrupoId() { return grupoId; }
     public void setGrupoId(String grupoId) { this.grupoId = grupoId; }
 
-    /**
-     * Mueve el bloque a una nueva hora de inicio, manteniendo su duración original.
-     * @param nuevaHoraInicio La nueva hora de inicio para el bloque.
-     */
-    public void moverHorario(LocalTime nuevaHoraInicio) {
-        Duration duracion = getDuracion();
-        LocalTime nuevaHoraFin = nuevaHoraInicio.plus(duracion);
-        validarIntervalo(nuevaHoraInicio, nuevaHoraFin);
-        this.horaInicio = nuevaHoraInicio;
-        this.horaFin = nuevaHoraFin;
-    }
 
     /**
      * Comprueba si dos bloques se traslapan en tiempo (independiente del día).
@@ -163,11 +158,7 @@ public class BloqueHorario implements HorarioComponente {
      * @return true si los intervalos se solapan
      */
     public boolean seSolapaCon(BloqueHorario b2) {
-        // Dos bloques se solapan si el inicio de uno es antes del fin del otro, Y
-        // el fin de uno es después del inicio del otro.
-        // La condición !isAfter es equivalente a isBefore o isEqual.
-        // No se solapan si uno termina antes o justo cuando el otro empieza.
-        return this.horaInicio.isBefore(b2.horaFin) && b2.horaInicio.isBefore(this.horaFin);
+        return !(this.horaFin.isBefore(b2.horaInicio) || this.horaInicio.isAfter(b2.horaFin));
     }
 
     

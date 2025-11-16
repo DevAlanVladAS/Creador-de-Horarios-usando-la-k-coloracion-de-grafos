@@ -28,7 +28,7 @@ public class InterfazDeUsuarioGUI extends JFrame {
 
     /** Inicializa todos los paneles y los agrega al Frame */
     public void inicializarComponentes() {
-        panelHorario = new PanelHorario("Grupo");
+        panelHorario = new PanelHorario();
         panelConfiguracion = new PanelConfiguracion();
         panelNotificaciones = new PanelNotificaciones();
         panelExportacion = new PanelExportacion();
