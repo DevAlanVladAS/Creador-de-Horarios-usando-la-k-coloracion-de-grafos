@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="CreadorHorarios" default="test" basedir=".">
+    <description>
+        Sistema de Creación de Horarios usando k-coloración de grafos
+    </description>
+
+    <!-- Propiedades del proyecto -->
+    <property name="src.dir" value="src"/>
+    <property name="test.dir" value="test"/>
+    <property name="build.dir" value="build"/>
+    <property name="build.classes.dir" value="${build.dir}/classes"/>
+    <property name="build.test.classes.dir" value="${build.dir}/test-classes"/>
+    <property name="lib.dir" value="lib"/>
+    <property name="reports.dir" value="reports"/>
+    <property name="reports.tests.dir" value="${reports.dir}/tests"/>
+
+    <!-- Classpath para compilación -->
+    <path id="compile.classpath">
+        <pathelement location="${build.classes.dir}"/>
+        <fileset dir="${lib.dir}" erroronmissingdir="false">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <!-- Classpath para pruebas -->
+    <path id="test.classpath">
+        <path refid="compile.classpath"/>
+        <pathelement location="${build.test.classes.dir}"/>
+        <fileset dir="${lib.dir}" erroronmissingdir="false">
+            <include name="junit-*.jar"/>
+            <include name="hamcrest-*.jar"/>
+        </fileset>
+    </path>
+
+    <!-- Target: init - Inicializa directorios -->
+    <target name="init">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${build.classes.dir}"/>
+        <mkdir dir="${build.test.classes.dir}"/>
+        <mkdir dir="${lib.dir}"/>
+        <mkdir dir="${reports.dir}"/>
+        <mkdir dir="${reports.tests.dir}"/>
+    </target>
+
+    <!-- Target: clean - Limpia directorios generados -->
+    <target name="clean" description="Limpia archivos compilados">
+        <delete dir="${build.dir}"/>
+        <delete dir="${reports.dir}"/>
+    </target>
+
+    <!-- Target: compile - Compila el código fuente -->
+    <target name="compile" depends="init" description="Compila el código fuente">
+        <javac srcdir="${src.dir}" 
+               destdir="${build.classes.dir}"
+               includeantruntime="false"
+               encoding="UTF-8"
+               source="11"
+               target="11">
+            <classpath refid="compile.classpath"/>
+            <include name="*.java"/>
+            <exclude name="**/test/**"/>
+        </javac>
+    </target>
+
+    <!-- Target: compile-tests - Compila las pruebas -->
+    <target name="compile-tests" depends="compile" description="Compila las pruebas">
+        <javac srcdir="${test.dir}"
+               destdir="${build.test.classes.dir}"
+               includeantruntime="false"
+               encoding="UTF-8"
+               source="11"
+               target="11">
+            <classpath refid="test.classpath"/>
+        </javac>
+    </target>
+
+    <!-- Target: test - Ejecuta las pruebas unitarias -->
+    <target name="test" depends="compile-tests" description="Ejecuta las pruebas unitarias">
+        <junit printsummary="yes" haltonfailure="no" haltonerror="no" fork="yes">
+            <classpath refid="test.classpath"/>
+            <formatter type="xml"/>
+            <formatter type="plain" usefile="false"/>
+            <batchtest todir="${reports.tests.dir}">
+                <fileset dir="${build.test.classes.dir}">
+                    <include name="**/*Test.class"/>
+                </fileset>
+            </batchtest>
+        </junit>
+    </target>
+
+    <!-- Target: test-report - Genera reporte HTML de pruebas -->
+    <target name="test-report" depends="test" description="Genera reporte HTML de pruebas">
+        <junitreport todir="${reports.tests.dir}">
+            <fileset dir="${reports.tests.dir}">
+                <include name="TEST-*.xml"/>
+            </fileset>
+            <report format="frames" todir="${reports.tests.dir}/html"/>
+        </junitreport>
+        <echo message="Reporte generado en: ${reports.tests.dir}/html/index.html"/>
+    </target>
+
+    <!-- Target: run - Ejecuta el ejemplo principal -->
+    <target name="run" depends="compile" description="Ejecuta el ejemplo de generación de horario">
+        <java classname="EjemploGeneracionHorario" fork="true">
+            <classpath refid="compile.classpath"/>
+        </java>
+    </target>
+
+    <!-- Target: all - Compila todo y ejecuta pruebas -->
+    <target name="all" depends="clean,compile,test,test-report" 
+            description="Limpia, compila y ejecuta todas las pruebas"/>
+</project>
