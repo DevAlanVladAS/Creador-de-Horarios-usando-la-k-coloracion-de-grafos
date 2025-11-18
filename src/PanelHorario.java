@@ -128,20 +128,20 @@ public class PanelHorario extends JPanel {
         panelSinAsignar.addBloquePanel(panel);
     }
 
-    private List<BloquePanel> getAllBloquePanels() {
-        List<BloquePanel> lista = new ArrayList<>();
-        for (CeldaHorario celda : celdas) {
-            if (celda.obtenerBloquePanel() != null) {
-                lista.add(celda.obtenerBloquePanel());
-            }
+    public List<BloquePanel> getAllBloquePanels() {
+    List<BloquePanel> lista = new ArrayList<>();
+    for (CeldaHorario celda : celdas) {
+        if (celda.obtenerBloquePanel() != null) {
+            lista.add(celda.obtenerBloquePanel());
         }
-        for (Component comp : panelSinAsignar.getComponents()) {
-            if (comp instanceof BloquePanel) {
-                lista.add((BloquePanel) comp);
-            }
-        }
-        return lista;
     }
+    for (Component comp : panelSinAsignar.getComponents()) {
+        if (comp instanceof BloquePanel) {
+            lista.add((BloquePanel) comp);
+        }
+    }
+    return lista;
+}
 
     private JLabel crearCabeceraDia(String texto) {
         JLabel label = new JLabel(texto, SwingConstants.CENTER);

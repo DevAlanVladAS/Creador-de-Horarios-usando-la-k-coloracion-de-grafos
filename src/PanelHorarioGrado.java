@@ -115,6 +115,27 @@ public class PanelHorarioGrado extends JPanel {
         repaint();
     }
 
+    public List<BloqueHorario> obtenerTodosLosBloques() {
+    List<BloqueHorario> todosBloques = new ArrayList<>();
+    
+    // Bloques en las celdas
+    for (CeldaHorarioGrado celda : celdas.values()) {
+        BloquePanel panel = celda.obtenerBloquePanel();
+        if (panel != null) {
+            todosBloques.add(panel.getBloque());
+        }
+    }
+    
+    // Bloques sin asignar
+    for (Component comp : panelSinAsignar.getComponents()) {
+        if (comp instanceof BloquePanel) {
+            todosBloques.add(((BloquePanel) comp).getBloque());
+        }
+    }
+    
+    return todosBloques;
+    }
+
     private java.util.Optional<BloqueHorario> findBloqueParaCelda(String grupoId, String dia, LocalTime hora) {
         return bloques.stream()
                 .filter(b -> b.getDia() != null && b.getHoraInicio() != null &&
