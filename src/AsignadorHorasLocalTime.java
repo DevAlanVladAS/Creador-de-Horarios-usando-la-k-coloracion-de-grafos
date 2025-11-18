@@ -81,8 +81,7 @@ public class AsignadorHorasLocalTime {
             LocalTime inicioOriginal = bloque.getHoraInicio();
             LocalTime finOriginal = bloque.getHoraFin();
 
-            bloque.setHoraInicio(inicio);
-            bloque.setHoraFin(fin);
+            bloque.actualizarIntervalo(inicio, fin);
 
             // 3. Validadores
             boolean valido = true;
@@ -102,8 +101,7 @@ public class AsignadorHorasLocalTime {
             }
 
             // Revertimos
-            bloque.setHoraInicio(inicioOriginal);
-            bloque.setHoraFin(finOriginal);
+            bloque.actualizarIntervalo(inicioOriginal, finOriginal);
 
             tiempo = tiempo.plusMinutes(30);
         }
