@@ -22,6 +22,7 @@ public class PanelHorario extends JPanel {
     private final PanelSinAsignar panelSinAsignar;
     private final List<CeldaHorario> celdas = new ArrayList<>();
     private final DropTargetListener dropListenerCelda;
+    private Runnable onBloquesActualizados;
 
     public PanelHorario() {
         setLayout(new BorderLayout(10, 10));
@@ -411,6 +412,7 @@ public class PanelHorario extends JPanel {
                 dtde.dropComplete(true);
                 actualizarMerges();
                 panelSinAsignar.actualizarEstadoVacio();
+                notificarCambios();
             } catch (Exception e) {
                 // Solo llamar rejectDrop si no fue aceptado aún
                 if (!aceptado) {
@@ -508,6 +510,7 @@ public class PanelHorario extends JPanel {
                     actualizarEstadoVacio();
                     dtde.dropComplete(true);
                     actualizarMerges();
+                    notificarCambios();
                 } else {
                     dtde.rejectDrop();
                 }
@@ -522,5 +525,15 @@ public class PanelHorario extends JPanel {
     public static PanelHorario.PanelSinAsignar crearPanelSinAsignar() {
         PanelHorario temp = new PanelHorario();
         return temp.new PanelSinAsignar();
+    }
+
+    public void setOnBloquesActualizados(Runnable listener) {
+        this.onBloquesActualizados = listener;
+    }
+
+    private void notificarCambios() {
+        if (onBloquesActualizados != null) {
+            onBloquesActualizados.run();
+        }
     }
 }

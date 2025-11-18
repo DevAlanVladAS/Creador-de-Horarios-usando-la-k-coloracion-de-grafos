@@ -21,13 +21,13 @@ public class InterfazGrafica extends JFrame {
     }
 
     private JTabbedPane tabbedPanelHorarios;
-    private JButton btnNuevoGrupo;
     private JButton btnCrearHorario;
     private JButton btnConfiguracion;
     private JButton btnExportar;
     private JComboBox<Integer> cmbGradoSelector;
     private JButton btnImportar;
     private JButton btnReiniciar;
+    private JLabel lblTituloProyecto;
 
     private static final Color COLOR_FONDO = new Color(245, 248, 255);
     private static final Color COLOR_ACCION_PRINCIPAL = new Color(76, 110, 245);
@@ -39,6 +39,7 @@ public class InterfazGrafica extends JFrame {
     private JLabel lblEstado;
 
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
+    private ConfiguracionProyecto configuracionProyecto = new ConfiguracionProyecto();
     
     // Cache de paneles para evitar recrearlos constantemente
     private final Map<String, PanelHorario> cachePanelesGrupo = new HashMap<>();
@@ -52,6 +53,7 @@ public class InterfazGrafica extends JFrame {
         setExtendedState(JFrame.MAXIMIZED_BOTH);
 
         initComponents();
+        actualizarTituloProyecto();
 
         catalogo.getTodosLosProfesores().stream()
                 .filter(p -> "algebra".equalsIgnoreCase(p.getNombre())
@@ -160,10 +162,12 @@ public class InterfazGrafica extends JFrame {
         PanelHorario panel = cachePanelesGrupo.get(grupo.getId());
         
         if (panel == null) {
-            // Crear nuevo panel si no existe en cache
-            panel = new PanelHorario();
-            cachePanelesGrupo.put(grupo.getId(), panel);
-        }
+              // Crear nuevo panel si no existe en cache
+              panel = new PanelHorario();
+              cachePanelesGrupo.put(grupo.getId(), panel);
+          }
+        panel.setOnBloquesActualizados(() ->
+                SwingUtilities.invokeLater(() -> actualizarVistaGeneral(grupo.getGrado())));
         
         // Recargar bloques desde el catálogo (que ya tiene el estado actualizado)
         List<BloqueHorario> bloquesDelGrupo = catalogo.getBloquesByGrupoId(grupo.getId());
@@ -195,29 +199,6 @@ public class InterfazGrafica extends JFrame {
 
     private void abrirCatalogoRecursos() {
         mostrarDialogoCatalogoRecursos();
-    }
-
-    private void onNuevoGrupo() {
-        String nombreGrupo = JOptionPane.showInputDialog(this,
-                "Ingrese el nombre del nuevo grupo (e.g., 1B, 3A):",
-                "Nuevo Grupo", JOptionPane.PLAIN_MESSAGE);
-
-        if (nombreGrupo != null && !nombreGrupo.trim().isEmpty()) {            
-            if (catalogo.findGrupoByName(nombreGrupo.trim()).isPresent()) {
-                JOptionPane.showMessageDialog(this, "El grupo '" + nombreGrupo.trim() + "' ya existe.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            GrupoEstudiantes nuevoGrupo = new GrupoEstudiantes(nombreGrupo.trim(), 1);
-            catalogo.addGrupo(nuevoGrupo);
-
-            if (tabbedPanelHorarios.getTabCount() == 1 && tabbedPanelHorarios.getTitleAt(0).equals("Inicio")) {
-                tabbedPanelHorarios.removeAll();
-            }
-
-            refrescarDatosYBloquesExistentes();
-            tabbedPanelHorarios.setSelectedIndex(tabbedPanelHorarios.getTabCount() - 1);
-        }
     }
 
     private void onCrearHorario() {
@@ -344,22 +325,21 @@ public class InterfazGrafica extends JFrame {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
 
-        JLabel title = new JLabel("Comienza configurando tu escuela");
+        JLabel title = new JLabel("Configura tu nuevo proyecto escolar");
         title.setFont(new Font("Segoe UI", Font.BOLD, 28));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel subtitle = new JLabel(
-                "<html>Aun no hay recursos registrados.<br/>"
-                        + "Abre el catalogo para dar de alta grupos, materias y profesores "
-                        + "y despues genera los 5 bloques estandar.</html>");
+                "<html>Aún no existen grupos configurados.<br/>"
+                        + "Inicia creando un proyecto, define los grupos por grado y personaliza tus recursos.</html>");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JButton btnCrear = new JButton("Agregar grupo");
-        btnCrear.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btnCrear.addActionListener(e -> onNuevoGrupo());
+        JButton btnConfigurarProyecto = new JButton("Configurar nuevo proyecto");
+        btnConfigurarProyecto.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btnConfigurarProyecto.addActionListener(e -> mostrarDialogoNuevoProyecto());
 
-        JButton btnCatalogo = new JButton("Abrir catalogo");
+        JButton btnCatalogo = new JButton("Gestionar catálogo de recursos");
         btnCatalogo.setAlignmentX(Component.CENTER_ALIGNMENT);
         btnCatalogo.addActionListener(e -> mostrarDialogoCatalogoRecursos());
 
@@ -368,7 +348,7 @@ public class InterfazGrafica extends JFrame {
         panel.add(Box.createRigidArea(new Dimension(0, 12)));
         panel.add(subtitle);
         panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        panel.add(btnCrear);
+        panel.add(btnConfigurarProyecto);
         panel.add(Box.createRigidArea(new Dimension(0, 8)));
         panel.add(btnCatalogo);
         panel.add(Box.createVerticalGlue());
@@ -376,9 +356,119 @@ public class InterfazGrafica extends JFrame {
         tabbedPanelHorarios.addTab("Inicio", panel);
     }
 
+    private void mostrarDialogoNuevoProyecto() {
+        PanelConfiguracionProyecto panelProyecto = new PanelConfiguracionProyecto();
+        panelProyecto.setConfiguracion(configuracionProyecto);
+
+        JDialog dialog = new JDialog(this, "Configurar nuevo proyecto", true);
+        panelProyecto.addGestionarRecursosListener(e -> mostrarDialogoCatalogoRecursos(dialog));
+        dialog.getContentPane().setLayout(new BorderLayout());
+        dialog.getContentPane().add(panelProyecto, BorderLayout.CENTER);
+
+        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnCancelar = new JButton("Cancelar");
+        JButton btnGuardar = new JButton("Crear proyecto");
+        acciones.add(btnCancelar);
+        acciones.add(btnGuardar);
+        dialog.getContentPane().add(acciones, BorderLayout.SOUTH);
+
+        btnCancelar.addActionListener(e -> dialog.dispose());
+        btnGuardar.addActionListener(e -> {
+            ConfiguracionProyecto nuevaConfig = panelProyecto.construirConfiguracion();
+            if (!nuevaConfig.estaCompleta()) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Indica el nombre de la escuela para continuar.",
+                        "Datos incompletos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            int totalGrupos = 0;
+            for (int grado = 1; grado <= 3; grado++) {
+                totalGrupos += nuevaConfig.getCantidadGrupos(grado);
+            }
+            if (totalGrupos == 0) {
+                JOptionPane.showMessageDialog(dialog,
+                        "Configura al menos un grupo para crear el proyecto.",
+                        "Sin grupos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (aplicarConfiguracionProyecto(nuevaConfig)) {
+                dialog.dispose();
+            }
+        });
+
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private boolean aplicarConfiguracionProyecto(ConfiguracionProyecto nuevaConfig) {
+        boolean hayDatosPrevios = !catalogo.getTodosLosGrupos().isEmpty()
+                || !catalogo.getAsignaciones().isEmpty()
+                || !catalogo.getTodosLosBloques().isEmpty();
+        if (hayDatosPrevios) {
+            int respuesta = JOptionPane.showConfirmDialog(this,
+                    "Se reiniciarán los grupos y bloques actuales. ¿Deseas continuar?",
+                    "Reiniciar proyecto", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (respuesta != JOptionPane.YES_OPTION) {
+                return false;
+            }
+        }
+
+        configuracionProyecto = nuevaConfig;
+        cachePanelesGrupo.clear();
+        cachePanelesGrado.clear();
+
+        catalogo.getAsignaciones().forEach(asignacion -> catalogo.removeAsignacion(asignacion.getId()));
+        catalogo.getTodosLosGrupos().forEach(grupo -> catalogo.removeGrupo(grupo.getId()));
+        catalogo.getTodosLosBloques().forEach(bloque -> catalogo.removeBloqueHorario(bloque.getId()));
+
+        crearGruposIniciales(nuevaConfig);
+        actualizarTituloProyecto();
+        refrescarDatosYBloquesExistentes();
+        return true;
+    }
+
+    private void crearGruposIniciales(ConfiguracionProyecto config) {
+        for (int grado = 1; grado <= 3; grado++) {
+            int cantidad = config.getCantidadGrupos(grado);
+            for (int indice = 0; indice < cantidad; indice++) {
+                GrupoEstudiantes grupo = new GrupoEstudiantes(generarNombreGrupo(indice), grado);
+                catalogo.addGrupo(grupo);
+            }
+        }
+    }
+
+    private String generarNombreGrupo(int indice) {
+        StringBuilder etiqueta = new StringBuilder();
+        int numero = indice;
+        do {
+            int residuo = numero % 26;
+            etiqueta.insert(0, (char) ('A' + residuo));
+            numero = (numero / 26) - 1;
+        } while (numero >= 0);
+        return etiqueta.toString();
+    }
+
+    private void actualizarTituloProyecto() {
+        if (lblTituloProyecto == null) {
+            return;
+        }
+        if (configuracionProyecto != null && configuracionProyecto.estaCompleta()) {
+            lblTituloProyecto.setText(configuracionProyecto.getNombreEscuela() + " - Planificador académico");
+        } else {
+            lblTituloProyecto.setText("Planificador academico basado en k-coloracion");
+        }
+    }
+
     private void mostrarDialogoCatalogoRecursos() {
-        JDialog dialog = new JDialog(this, "Catalogo de recursos", true);
-        PanelConfiguracion panelConfig = new PanelConfiguracion();
+        mostrarDialogoCatalogoRecursos(this);
+    }
+
+    private void mostrarDialogoCatalogoRecursos(Window parentWindow) {
+        boolean hayGrupos = !catalogo.getTodosLosGrupos().isEmpty();
+        Window owner = parentWindow != null ? parentWindow : this;
+        JDialog dialog = new JDialog(owner, "Catalogo de recursos", Dialog.ModalityType.DOCUMENT_MODAL);
+        PanelConfiguracion panelConfig = new PanelConfiguracion(false, hayGrupos);
         panelConfig.setParentDialog(dialog);
         dialog.getContentPane().add(panelConfig);
         dialog.pack();
@@ -398,6 +488,21 @@ public class InterfazGrafica extends JFrame {
         
         actualizarSelectorDeGrado();
         cargarPestanasDeGrupos();
+    }
+
+    private void actualizarVistaGeneral(int grado) {
+        PanelHorarioGrado panelGrado = cachePanelesGrado.get(grado);
+        if (panelGrado == null) {
+            return;
+        }
+        List<GrupoEstudiantes> gruposDelGrado = catalogo.getGruposPorGrado(grado).stream()
+                .sorted(Comparator.comparing(GrupoEstudiantes::getNombre))
+                .collect(Collectors.toList());
+        List<String> ids = gruposDelGrado.stream()
+                .map(GrupoEstudiantes::getId)
+                .collect(Collectors.toList());
+        List<BloqueHorario> bloques = catalogo.getBloquesByGrupoIds(ids);
+        panelGrado.cargarBloques(bloques);
     }
 
     private void actualizarSelectorDeGrado() {
@@ -474,6 +579,7 @@ public class InterfazGrafica extends JFrame {
         JMenuItem itemExportar = new JMenuItem("Exportar");
         JMenuItem itemSalir = new JMenuItem("Salir");
 
+        itemNuevo.addActionListener(e -> mostrarDialogoNuevoProyecto());
         itemExportar.addActionListener(e -> onExportar());
         itemSalir.addActionListener(e -> System.exit(0));
 
@@ -525,21 +631,18 @@ public class InterfazGrafica extends JFrame {
         botonesPanel.add(cmbGradoSelector);
 
         btnConfiguracion = crearBoton("Catalogo de recursos", COLOR_ACCION_PRINCIPAL);
-        btnNuevoGrupo = crearBoton("Agregar grupo", COLOR_ACCION_SECUNDARIA);
         btnCrearHorario = crearBoton("Planificar semana", COLOR_ACCION_ALERTA);
         btnExportar = crearBoton("Compartir horario", COLOR_ACCION_DORADO);
         btnImportar = crearBoton("Importar plantilla", COLOR_ACCION_VIOLETA);
         btnReiniciar = crearBoton("Reiniciar Horario", new Color(220, 53, 69));
 
         btnConfiguracion.addActionListener(e -> abrirCatalogoRecursos());
-        btnNuevoGrupo.addActionListener(e -> onNuevoGrupo());
         btnCrearHorario.addActionListener(e -> onCrearHorario());
         btnExportar.addActionListener(e -> onExportar());
         btnImportar.addActionListener(e -> onImportar());
         btnReiniciar.addActionListener(e -> onReiniciarHorario());
 
         botonesPanel.add(btnConfiguracion);
-        botonesPanel.add(btnNuevoGrupo);
         botonesPanel.add(btnCrearHorario);
         botonesPanel.add(btnExportar);
         botonesPanel.add(btnImportar);
@@ -549,11 +652,11 @@ public class InterfazGrafica extends JFrame {
         JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
         eastPanel.setBackground(COLOR_FONDO);
 
-        JLabel lblTitulo = new JLabel("Planificador academico basado en k-coloracion");
-        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        lblTitulo.setHorizontalAlignment(SwingConstants.RIGHT);
+        lblTituloProyecto = new JLabel("Planificador academico basado en k-coloracion");
+        lblTituloProyecto.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblTituloProyecto.setHorizontalAlignment(SwingConstants.RIGHT);
 
-        eastPanel.add(lblTitulo);
+        eastPanel.add(lblTituloProyecto);
         eastPanel.add(btnReiniciar);
         panel.add(eastPanel, BorderLayout.EAST);
 

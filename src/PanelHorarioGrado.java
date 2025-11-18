@@ -1,8 +1,6 @@
 package src;
 
 import javax.swing.*;
-import java.awt.dnd.*;
-import java.awt.datatransfer.Transferable;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -24,7 +22,7 @@ public class PanelHorarioGrado extends JPanel {
     private final Map<String, CeldaHorarioGrado> celdas = new java.util.HashMap<>();
     private final List<GrupoEstudiantes> grupos;
     private List<BloqueHorario> bloques;
-    private final PanelHorario.PanelSinAsignar panelSinAsignar;
+    private final PanelSinAsignarGrado panelSinAsignar;
 
     public PanelHorarioGrado(List<GrupoEstudiantes> grupos, List<BloqueHorario> bloques) {
         // Ordenar grupos por nombre para una visualización consistente
@@ -32,6 +30,7 @@ public class PanelHorarioGrado extends JPanel {
                 .sorted(java.util.Comparator.comparing(GrupoEstudiantes::getNombre))
                 .collect(Collectors.toList());
         this.bloques = bloques;
+        this.panelSinAsignar = new PanelSinAsignarGrado();
 
         setLayout(new BorderLayout(10, 10));
 
@@ -61,14 +60,12 @@ public class PanelHorarioGrado extends JPanel {
         }
 
         // --- Contenido de la cuadrícula ---
-        DropTargetListener dropListener = crearDropTargetListener();
         for (LocalTime hora : HORAS_DIA) {
             gridPanel.add(crearCabeceraHora(formatearHora(hora)));
 
             for (GrupoEstudiantes grupo : this.grupos) {
                 for (String dia : DIAS_SEMANA) {
                     CeldaHorarioGrado celda = new CeldaHorarioGrado(dia, hora, grupo.getId());
-                    new DropTarget(celda, DnDConstants.ACTION_MOVE, dropListener, true);
                     celdas.put(celda.getKey(), celda);
                     gridPanel.add(celda);
                 }
@@ -76,7 +73,6 @@ public class PanelHorarioGrado extends JPanel {
         }
 
         // Panel de bloques sin asignar
-        panelSinAsignar = PanelHorario.crearPanelSinAsignar();
         cargarBloques(bloques);
 
         JScrollPane scrollSinAsignar = new JScrollPane(panelSinAsignar);
@@ -103,12 +99,12 @@ public class PanelHorarioGrado extends JPanel {
                 String key = CeldaHorarioGrado.generarKey(bloque.getDia(), bloque.getHoraInicio(), bloque.getGrupoId());
                 CeldaHorarioGrado celda = celdas.get(key);
                 if (celda != null) {
-                    celda.colocarBloque(new BloquePanel(bloque));
+                    celda.colocarBloque(new BloquePanel(bloque, false));
                     continue;
                 }
             }
             // Si no se pudo colocar, va a sin asignar
-            panelSinAsignar.addBloquePanel(new BloquePanel(bloque));
+            panelSinAsignar.addBloquePanel(new BloquePanel(bloque, false));
         }
         panelSinAsignar.actualizarEstadoVacio();
         revalidate();
@@ -116,33 +112,21 @@ public class PanelHorarioGrado extends JPanel {
     }
 
     public List<BloqueHorario> obtenerTodosLosBloques() {
-    List<BloqueHorario> todosBloques = new ArrayList<>();
-    
-    // Bloques en las celdas
-    for (CeldaHorarioGrado celda : celdas.values()) {
-        BloquePanel panel = celda.obtenerBloquePanel();
-        if (panel != null) {
-            todosBloques.add(panel.getBloque());
-        }
-    }
-    
-    // Bloques sin asignar
-    for (Component comp : panelSinAsignar.getComponents()) {
-        if (comp instanceof BloquePanel) {
-            todosBloques.add(((BloquePanel) comp).getBloque());
-        }
-    }
-    
-    return todosBloques;
-    }
+        List<BloqueHorario> todosBloques = new ArrayList<>();
 
-    private java.util.Optional<BloqueHorario> findBloqueParaCelda(String grupoId, String dia, LocalTime hora) {
-        return bloques.stream()
-                .filter(b -> b.getDia() != null && b.getHoraInicio() != null &&
-                        b.getGrupoId().equals(grupoId) &&
-                        b.getDia().equalsIgnoreCase(dia) &&
-                        b.getHoraInicio().equals(hora))
-                .findFirst();
+        for (CeldaHorarioGrado celda : celdas.values()) {
+            BloquePanel panel = celda.obtenerBloquePanel();
+            if (panel != null) {
+                todosBloques.add(panel.getBloque());
+            }
+        }
+
+        for (Component comp : panelSinAsignar.getComponents()) {
+            if (comp instanceof BloquePanel) {
+                todosBloques.add(((BloquePanel) comp).getBloque());
+            }
+        }
+        return todosBloques;
     }
 
     private JLabel crearCabeceraGrupoPrincipal(String texto) {
@@ -178,105 +162,101 @@ public class PanelHorarioGrado extends JPanel {
         return hora.format(HORA_FORMATTER);
     }
 
-    private DropTargetListener crearDropTargetListener() {
-        return new DropTargetListener() {
-            @Override
-            public void dragEnter(DropTargetDragEvent dtde) {
-                Component comp = dtde.getDropTargetContext().getComponent();
-                if (comp instanceof CeldaHorarioGrado) {
-                    ((CeldaHorarioGrado) comp).setBorder(BorderFactory.createMatteBorder(2, 2, 2, 2, new Color(78, 115, 223)));
-                }
-            }
-
-            @Override
-            public void dragOver(DropTargetDragEvent dtde) {}
-
-            @Override
-            public void dropActionChanged(DropTargetDragEvent dtde) {}
-
-            @Override
-            public void dragExit(DropTargetEvent dte) {
-                Component comp = dte.getDropTargetContext().getComponent();
-                if (comp instanceof CeldaHorarioGrado) {
-                    ((CeldaHorarioGrado) comp).actualizarBorde(false, false);
-                }
-            }
-
-            @Override
-            public void drop(DropTargetDropEvent dtde) {
-                Component comp = dtde.getDropTargetContext().getComponent();
-                if (!(comp instanceof CeldaHorarioGrado)) {
-                    dtde.rejectDrop();
-                    return;
-                }
-                CeldaHorarioGrado celda = (CeldaHorarioGrado) comp;
-                try {
-                    Transferable tr = dtde.getTransferable();
-                    if (!tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
-                        dtde.rejectDrop();
-                        return;
-                    }
-
-                    BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
-
-                    // Validar que el bloque pertenece a este grupo
-                    if (!bloqueTransferido.getGrupoId().equals(celda.getGrupoId())) {
-                        dtde.rejectDrop();
-                        return;
-                    }
-
-                    dtde.acceptDrop(DnDConstants.ACTION_MOVE);
-                    
-                    bloqueTransferido.setDia(celda.getDia());
-                    bloqueTransferido.setHoraInicio(celda.getHora());
-                    bloqueTransferido.setHoraFin(celda.getHora().plus(PlantillaHoraria.DURACION_BLOQUE));
-
-                    dtde.getDropTargetContext().dropComplete(true);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    dtde.rejectDrop();
-                } finally {
-                    celda.actualizarBorde(false, false);
-                }
-            }
-        };
-    }
-
     /**
-     * Celda especializada para el horario de grado, que también conoce el ID del grupo.
+     * Celda de solo lectura utilizada en la vista general del grado.
      */
-    public class CeldaHorarioGrado extends PanelHorario.CeldaHorario {
+    public class CeldaHorarioGrado extends JPanel {
+        private final String dia;
+        private final LocalTime hora;
         private final String grupoId;
 
         CeldaHorarioGrado(String dia, LocalTime hora, String grupoId) {
-            super(dia, hora);
+            this.dia = dia;
+            this.hora = hora;
             this.grupoId = grupoId;
+            setLayout(new BorderLayout());
+            setBackground(Color.WHITE);
+            setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, new Color(230, 230, 230)));
         }
 
-        public String getGrupoId() {
-            return grupoId;
-        }
+        public String getDia() { return dia; }
+        public LocalTime getHora() { return hora; }
+        public String getGrupoId() { return grupoId; }
 
         public String getKey() {
-            return generarKey(getDia(), getHora(), grupoId);
+            return generarKey(dia, hora, grupoId);
         }
 
         public static String generarKey(String dia, LocalTime hora, String grupoId) {
             return dia + "-" + hora.toString() + "-" + grupoId;
         }
 
-        @Override
         public void colocarBloque(BloquePanel panel) {
-            // Validar que el bloque que se intenta colocar pertenece a este grupo
-            if (!panel.getBloque().getGrupoId().equals(this.grupoId)) {
-                 JOptionPane.showMessageDialog(this,
-                         "Este bloque pertenece a otro grupo y no puede ser colocado aquí.",
-                         "Error de asignación",
-                         JOptionPane.ERROR_MESSAGE);
-                 // Idealmente, el bloque debería volver a su lugar original.
-                 return;
+            removeAll();
+            add(panel, BorderLayout.CENTER);
+            revalidate();
+            repaint();
+        }
+
+        public BloquePanel obtenerBloquePanel() {
+            if (getComponentCount() == 0) {
+                return null;
             }
-            super.colocarBloque(panel);
+            Component comp = getComponent(0);
+            return comp instanceof BloquePanel ? (BloquePanel) comp : null;
+        }
+
+        public void reset() {
+            removeAll();
+            revalidate();
+            repaint();
+        }
+    }
+
+    private class PanelSinAsignarGrado extends JPanel {
+        private final JLabel lblEmpty;
+
+        PanelSinAsignarGrado() {
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            setBackground(new Color(248, 248, 248));
+            setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            lblEmpty = new JLabel("Bloques pendientes de asignar", SwingConstants.CENTER);
+            lblEmpty.setAlignmentX(Component.CENTER_ALIGNMENT);
+            add(lblEmpty);
+        }
+
+        void resetContenido() {
+            removeAll();
+            add(lblEmpty);
+            revalidate();
+            repaint();
+        }
+
+        void addBloquePanel(BloquePanel panel) {
+            if (lblEmpty.getParent() == this) {
+                remove(lblEmpty);
+            }
+            panel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+            add(panel);
+            revalidate();
+            repaint();
+        }
+
+        void actualizarEstadoVacio() {
+            boolean hayBloques = false;
+            for (Component comp : getComponents()) {
+                if (comp instanceof BloquePanel) {
+                    hayBloques = true;
+                    break;
+                }
+            }
+            lblEmpty.setVisible(!hayBloques);
+            if (!hayBloques && lblEmpty.getParent() != this) {
+                add(lblEmpty);
+            }
+            revalidate();
+            repaint();
         }
     }
 }

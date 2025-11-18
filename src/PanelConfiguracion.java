@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 public class PanelConfiguracion extends JPanel {
 
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
+    private final boolean permitirGestionGrupos;
+    private final boolean permitirAsignaciones;
     private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
     private final String[] HORAS_CLASE = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00"};
 
@@ -55,6 +57,12 @@ public class PanelConfiguracion extends JPanel {
     private JDialog parentDialog;
 
     public PanelConfiguracion() {
+        this(true, true);
+    }
+
+    public PanelConfiguracion(boolean permitirGestionGrupos, boolean permitirAsignaciones) {
+        this.permitirGestionGrupos = permitirGestionGrupos;
+        this.permitirAsignaciones = permitirAsignaciones;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -72,6 +80,16 @@ public class PanelConfiguracion extends JPanel {
         add(tabs, BorderLayout.CENTER);
 
         recargarDatos();
+    }
+
+    private JPanel crearPanelSoloLectura(String mensaje) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
+
+        JLabel label = new JLabel("<html>" + mensaje + "</html>", SwingConstants.CENTER);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        panel.add(label, BorderLayout.CENTER);
+        return panel;
     }
 
     public void setParentDialog(JDialog parentDialog) {
@@ -240,6 +258,10 @@ public class PanelConfiguracion extends JPanel {
     // ----------------------------------------------------
 
     private JPanel crearPanelGrupos() {
+        if (!permitirGestionGrupos) {
+            return crearPanelSoloLectura("Los grupos se generan al iniciar un proyecto. Usa el configurador de 'Nuevo proyecto' para definirlos.");
+        }
+
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createTitledBorder("Grupos escolares"));
 
@@ -252,57 +274,13 @@ public class PanelConfiguracion extends JPanel {
 
         panel.add(new JScrollPane(tablaGrupos), BorderLayout.CENTER);
 
-        JPanel formulario = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtNombreGrupo = new JTextField(15);
-        JButton btnAgregar = new JButton("Registrar grupo");
-        spGradoGrupo = new JSpinner(new SpinnerNumberModel(1, 1, 6, 1));
-        JButton btnEliminar = new JButton("Eliminar seleccionado");
-
-        btnAgregar.addActionListener(e -> guardarGrupo());
-        btnEliminar.addActionListener(e -> eliminarGrupoSeleccionado());
-
-        formulario.add(new JLabel("Grado:"));
-        formulario.add(spGradoGrupo);
-        formulario.add(new JLabel("Nombre (p.e. 'A', 'B'):"));
-        formulario.add(txtNombreGrupo);
-        formulario.add(btnAgregar);
-        formulario.add(btnEliminar);
-        panel.add(formulario, BorderLayout.SOUTH);
+        JPanel aviso = new JPanel(new BorderLayout());
+        JLabel lblInfo = new JLabel("<html>Los grupos solo pueden editarse desde la configuración del proyecto actual.</html>");
+        lblInfo.setHorizontalAlignment(SwingConstants.LEFT);
+        aviso.add(lblInfo, BorderLayout.CENTER);
+        panel.add(aviso, BorderLayout.SOUTH);
         return panel;
     }
-
-    private void guardarGrupo() {
-        String nombre = txtNombreGrupo.getText().trim();
-        int grado = (Integer) spGradoGrupo.getValue();
-        if (nombre.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Nombre de grupo vacío.", "Validación", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        GrupoEstudiantes grupo = new GrupoEstudiantes(nombre, grado);
-        catalogo.addGrupo(grupo);
-        spGradoGrupo.setValue(1);
-        txtNombreGrupo.setText("");
-        cargarGruposEnTabla();
-        refrescarCombosAsignaciones();
-    }
-
-    private void eliminarGrupoSeleccionado() {
-        int fila = tablaGrupos.getSelectedRow();
-        if (fila < 0) return;
-        // Obtener grado y nombre para una búsqueda precisa
-        int grado = (Integer) modeloGrupos.getValueAt(fila, 0);
-        String nombre = (String) modeloGrupos.getValueAt(fila, 1);
-        catalogo.getTodosLosGrupos().stream()
-                .filter(g -> g.getGrado() == grado && g.getNombre().equals(nombre))
-                .findFirst().ifPresent(g -> catalogo.removeGrupo(g.getId()));
-        cargarGruposEnTabla();
-        refrescarCombosAsignaciones();
-    }
-
-    // ----------------------------------------------------
-    // SALONES
-    // ----------------------------------------------------
-
     private JPanel crearPanelSalones() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createTitledBorder("Salones de clase"));
@@ -456,6 +434,10 @@ public class PanelConfiguracion extends JPanel {
     // ----------------------------------------------------
 
     private JPanel crearPanelAsignaciones() {
+        if (!permitirAsignaciones) {
+            return crearPanelSoloLectura("Configura un proyecto y crea al menos un grupo para comenzar a registrar asignaciones.");
+        }
+
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
         modeloAsignaciones = new DefaultTableModel(new String[]{"Grupo", "Materia", "Profesor", "Horas", "Salón", "ID"}, 0) {
@@ -479,78 +461,72 @@ public class PanelConfiguracion extends JPanel {
         cmbGrupoAsignacion = new JComboBox<>();
         cmbMateriaAsignacion = new JComboBox<>();
         cmbProfesorAsignacion = new JComboBox<>();
-        cmbProfesorAsignacion.addActionListener(e -> actualizarMateriaPorProfesor());
         cmbSalonAsignacion = new JComboBox<>();
-        cmbSalonAsignacion.addItem(null); // Opción sin salón
-        cmbSalonAsignacion.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (value instanceof Salon) {
-                    setText(((Salon) value).getNombre());
-                } else {
-                    setText("Sin salón fijo");
-                }
-                return this;
-            }
-        });
-        spHorasAsignacion = new JSpinner(new SpinnerNumberModel(5, 1, 20, 1));
-        chkMateriaLibre = new JCheckBox("Permitir materia distinta al profesor");
-        chkMateriaLibre.addActionListener(e -> actualizarMateriaPorProfesor());
+        spHorasAsignacion = new JSpinner(new SpinnerNumberModel(1, 1, 10, 1));
 
-        int fila = 0;
-        agregarCampoFormulario(formulario, gbc, fila++, "Grupo:", cmbGrupoAsignacion);
-        agregarCampoFormulario(formulario, gbc, fila++, "Materia:", cmbMateriaAsignacion);
-        agregarCampoFormulario(formulario, gbc, fila++, "Profesor:", cmbProfesorAsignacion);
-        agregarCampoFormulario(formulario, gbc, fila++, "Salón:", cmbSalonAsignacion);
-        agregarCampoFormulario(formulario, gbc, fila++, "Horas a la semana:", spHorasAsignacion);
+        gbc.gridx = 0; gbc.gridy = 0; formulario.add(new JLabel("Grupo:"), gbc);
+        gbc.gridx = 1; formulario.add(cmbGrupoAsignacion, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; formulario.add(new JLabel("Profesor:"), gbc);
+        gbc.gridx = 1; formulario.add(cmbProfesorAsignacion, gbc);
+        gbc.gridx = 0; gbc.gridy = 2; formulario.add(new JLabel("Materia:"), gbc);
+        gbc.gridx = 1; formulario.add(cmbMateriaAsignacion, gbc);
+        gbc.gridx = 0; gbc.gridy = 3; formulario.add(new JLabel("Horas:"), gbc);
+        gbc.gridx = 1; formulario.add(spHorasAsignacion, gbc);
+        gbc.gridx = 0; gbc.gridy = 4; formulario.add(new JLabel("Salón:"), gbc);
+        gbc.gridx = 1; formulario.add(cmbSalonAsignacion, gbc);
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2; formulario.add(chkMateriaLibre, gbc);
 
-        gbc.gridx = 0;
-        gbc.gridy = fila++;
-        gbc.gridwidth = 2;
-        formulario.add(chkMateriaLibre, gbc);
-
-        JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton btnGuardar = new JButton("Guardar asignación");
-        JButton btnEditar = new JButton("Editar seleccionada");
-        JButton btnEliminar = new JButton("Eliminar seleccionada");
+        JButton btnEditar = new JButton("Editar");
+        JButton btnEliminar = new JButton("Eliminar");
 
         btnGuardar.addActionListener(e -> guardarAsignacion());
         btnEditar.addActionListener(e -> editarAsignacionSeleccionada());
         btnEliminar.addActionListener(e -> eliminarAsignacionSeleccionada());
 
-        botones.add(btnGuardar);
-        botones.add(btnEditar);
-        botones.add(btnEliminar);
+        acciones.add(btnEditar);
+        acciones.add(btnEliminar);
+        acciones.add(btnGuardar);
 
-        gbc.gridx = 0;
-        gbc.gridy = fila;
-        gbc.gridwidth = 2;
-        formulario.add(botones, gbc);
+        gbc.gridy = 6;
+        formulario.add(acciones, gbc);
 
         panel.add(formulario, BorderLayout.SOUTH);
         return panel;
     }
 
     private void guardarAsignacion() {
-        GrupoEstudiantes grupo = (GrupoEstudiantes) cmbGrupoAsignacion.getSelectedItem();
-        Materia materia = (Materia) cmbMateriaAsignacion.getSelectedItem();
-        Profesor profesor = (Profesor) cmbProfesorAsignacion.getSelectedItem();
-        Salon salon = (Salon) cmbSalonAsignacion.getSelectedItem();
-        int horas = (Integer) spHorasAsignacion.getValue();
-
-        if (grupo == null || profesor == null) {
-            JOptionPane.showMessageDialog(this, "Seleccione grupo y profesor.", "Validación", JOptionPane.WARNING_MESSAGE);
+        if (!permitirAsignaciones || cmbGrupoAsignacion == null) {
             return;
         }
-        if (materia == null) {
-            JOptionPane.showMessageDialog(this, "Seleccione una materia válida.", "Validación", JOptionPane.WARNING_MESSAGE);
+
+        GrupoEstudiantes grupo = (GrupoEstudiantes) cmbGrupoAsignacion.getSelectedItem();
+        Profesor profesor = (Profesor) cmbProfesorAsignacion.getSelectedItem();
+        Materia materia = (Materia) cmbMateriaAsignacion.getSelectedItem();
+        Salon salon = (Salon) cmbSalonAsignacion.getSelectedItem();
+        int horas = spHorasAsignacion != null ? (Integer) spHorasAsignacion.getValue() : 0;
+
+        if (grupo == null || profesor == null || materia == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Selecciona un grupo, profesor y materia para registrar la asignación.",
+                    "Datos incompletos",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (horas <= 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Las horas semanales deben ser mayores a cero.",
+                    "Datos inválidos",
+                    JOptionPane.WARNING_MESSAGE);
+            if (spHorasAsignacion != null) {
+                spHorasAsignacion.setValue(1);
+            }
             return;
         }
 
         if (asignacionEnEdicion != null) {
             catalogo.removeAsignacion(asignacionEnEdicion.getId());
-            asignacionEnEdicion = null;
         }
 
         AsignacionAcademica asignacion = new AsignacionAcademica(
@@ -562,67 +538,85 @@ public class PanelConfiguracion extends JPanel {
         );
         catalogo.addAsignacionAcademica(asignacion);
 
-        // Feedback inmediato al usuario
-        JOptionPane.showMessageDialog(this,
-                "✓ Asignación creada exitosamente\n" +
-                "  Se generaron " + horas + " bloques de 1 hora para el grupo " + grupo.getNombre(),
-                "Generación completada", JOptionPane.INFORMATION_MESSAGE);
-
-        spHorasAsignacion.setValue(5);
-        chkMateriaLibre.setSelected(false);
-        actualizarMateriaPorProfesor();
+        asignacionEnEdicion = null;
         cargarAsignacionesEnTabla();
+        refrescarCombosAsignaciones();
+        limpiarFormularioAsignacion();
+
+        JOptionPane.showMessageDialog(this,
+                "Asignación guardada correctamente.",
+                "Asignaciones",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void editarAsignacionSeleccionada() {
-        int fila = tablaAsignaciones.getSelectedRow();
-        if (fila < 0) return;
-        String id = (String) modeloAsignaciones.getValueAt(fila, 5);
-        asignacionEnEdicion = catalogo.getAsignaciones().stream()
-                .filter(a -> a.getId().equals(id))
-                .findFirst()
-                .orElse(null);
-        if (asignacionEnEdicion == null) {
+        if (!permitirAsignaciones || tablaAsignaciones == null) {
             return;
         }
+        String id = obtenerIdAsignacionSeleccionada();
+        if (id == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Selecciona una asignación en la tabla para editarla.",
+                    "Asignaciones",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        asignacionEnEdicion = buscarAsignacionPorId(id);
+        if (asignacionEnEdicion == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No se encontró la asignación seleccionada.",
+                    "Asignaciones",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
         seleccionarElemento(cmbGrupoAsignacion, asignacionEnEdicion.getGrupoId());
         seleccionarElemento(cmbProfesorAsignacion, asignacionEnEdicion.getProfesorId());
-        actualizarMateriaPorProfesor();
-        seleccionarElemento(cmbMateriaAsignacion, asignacionEnEdicion.getMateriaId());
-        seleccionarElemento(cmbSalonAsignacion, asignacionEnEdicion.getSalonId());
-        Materia materia = catalogo.obtenerMateriaPorId(asignacionEnEdicion.getMateriaId());
-        Profesor profesor = catalogo.obtenerProfesorPorId(asignacionEnEdicion.getProfesorId());
-        chkMateriaLibre.setSelected(false);
-        if (profesor == null || profesor.getMateriaAsignada() == null || materia == null ||
-                !profesor.getMateriaAsignada().equalsIgnoreCase(materia.getNombre())) {
+        if (chkMateriaLibre != null) {
             chkMateriaLibre.setSelected(true);
-            cmbMateriaAsignacion.setEnabled(true);
-        } else {
-            cmbMateriaAsignacion.setEnabled(false);
         }
-        spHorasAsignacion.setValue(asignacionEnEdicion.getHorasSemanales());
+        if (cmbMateriaAsignacion != null) {
+            cmbMateriaAsignacion.setEnabled(true);
+            seleccionarElemento(cmbMateriaAsignacion, asignacionEnEdicion.getMateriaId());
+        }
+
+        if (asignacionEnEdicion.getSalonId() != null) {
+            seleccionarElemento(cmbSalonAsignacion, asignacionEnEdicion.getSalonId());
+        } else if (cmbSalonAsignacion.getItemCount() > 0) {
+            cmbSalonAsignacion.setSelectedIndex(0);
+        }
+        if (spHorasAsignacion != null) {
+            spHorasAsignacion.setValue(asignacionEnEdicion.getHorasSemanales());
+        }
     }
 
     private void eliminarAsignacionSeleccionada() {
-        int fila = tablaAsignaciones.getSelectedRow();
-        if (fila < 0) return;
-        String id = (String) modeloAsignaciones.getValueAt(fila, 5);
+        if (!permitirAsignaciones || tablaAsignaciones == null) {
+            return;
+        }
+        String id = obtenerIdAsignacionSeleccionada();
+        if (id == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Selecciona una asignación para eliminar.",
+                    "Asignaciones",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Deseas eliminar la asignación seleccionada?",
+                "Confirmar eliminación",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
         catalogo.removeAsignacion(id);
+        if (asignacionEnEdicion != null && asignacionEnEdicion.getId().equals(id)) {
+            asignacionEnEdicion = null;
+            limpiarFormularioAsignacion();
+        }
         cargarAsignacionesEnTabla();
-    }
-
-    // ----------------------------------------------------
-    // CARGA DE DATOS
-    // ----------------------------------------------------
-
-    private void recargarDatos() {
-        cargarMateriasEnCombos();
-        cargarProfesoresEnTabla();
-        cargarGruposEnTabla();
-        cargarSalonesEnTabla();
-        cargarMateriasEnTabla();
         refrescarCombosAsignaciones();
-        cargarAsignacionesEnTabla();
     }
 
     private void cargarProfesoresEnTabla() {
@@ -637,6 +631,7 @@ public class PanelConfiguracion extends JPanel {
     }
 
     private void cargarGruposEnTabla() {
+        if (modeloGrupos == null) return;
         modeloGrupos.setRowCount(0);
         for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
             modeloGrupos.addRow(new Object[]{grupo.getGrado(), grupo.getNombre()});
@@ -658,13 +653,18 @@ public class PanelConfiguracion extends JPanel {
     }
 
     private void cargarMateriasEnCombos() {
-        if (cmbMateriaProfesor == null || cmbMateriaAsignacion == null) return;
-        cmbMateriaProfesor.removeAllItems();
-        cmbMateriaAsignacion.removeAllItems();
-        cmbMateriaProfesor.addItem(null);
-        for (Materia materia : catalogo.getTodasLasMaterias()) {
-            cmbMateriaProfesor.addItem(materia);
-            cmbMateriaAsignacion.addItem(materia);
+        if (cmbMateriaProfesor != null) {
+            cmbMateriaProfesor.removeAllItems();
+            cmbMateriaProfesor.addItem(null);
+            for (Materia materia : catalogo.getTodasLasMaterias()) {
+                cmbMateriaProfesor.addItem(materia);
+            }
+        }
+        if (cmbMateriaAsignacion != null) {
+            cmbMateriaAsignacion.removeAllItems();
+            for (Materia materia : catalogo.getTodasLasMaterias()) {
+                cmbMateriaAsignacion.addItem(materia);
+            }
         }
         actualizarMateriaPorProfesor();
     }
@@ -692,6 +692,7 @@ public class PanelConfiguracion extends JPanel {
     }
 
     private void cargarAsignacionesEnTabla() {
+        if (modeloAsignaciones == null) return;
         modeloAsignaciones.setRowCount(0);
         for (AsignacionAcademica asignacion : catalogo.getAsignaciones()) {
             GrupoEstudiantes grupo = catalogo.obtenerGrupoPorId(asignacion.getGrupoId());
@@ -799,7 +800,7 @@ public class PanelConfiguracion extends JPanel {
     }
 
     private void seleccionarElemento(JComboBox<?> combo, String id) {
-        if (combo.getItemCount() == 0) {
+        if (combo == null || combo.getItemCount() == 0) {
             return;
         }
         if (id == null) {
@@ -828,6 +829,55 @@ public class PanelConfiguracion extends JPanel {
         combo.setSelectedIndex(0);
     }
 
+    private void limpiarFormularioAsignacion() {
+        if (tablaAsignaciones != null) {
+            tablaAsignaciones.clearSelection();
+        }
+        asignacionEnEdicion = null;
+        if (cmbGrupoAsignacion != null && cmbGrupoAsignacion.getItemCount() > 0) {
+            cmbGrupoAsignacion.setSelectedIndex(0);
+        }
+        if (cmbProfesorAsignacion != null && cmbProfesorAsignacion.getItemCount() > 0) {
+            cmbProfesorAsignacion.setSelectedIndex(0);
+        }
+        if (cmbMateriaAsignacion != null && cmbMateriaAsignacion.getItemCount() > 0) {
+            cmbMateriaAsignacion.setSelectedIndex(0);
+        }
+        if (cmbSalonAsignacion != null && cmbSalonAsignacion.getItemCount() > 0) {
+            cmbSalonAsignacion.setSelectedIndex(0);
+        }
+        if (spHorasAsignacion != null) {
+            spHorasAsignacion.setValue(1);
+        }
+        if (chkMateriaLibre != null) {
+            chkMateriaLibre.setSelected(false);
+        }
+        actualizarMateriaPorProfesor();
+    }
+
+    private String obtenerIdAsignacionSeleccionada() {
+        if (tablaAsignaciones == null) {
+            return null;
+        }
+        int fila = tablaAsignaciones.getSelectedRow();
+        if (fila < 0) {
+            return null;
+        }
+        int filaModelo = tablaAsignaciones.convertRowIndexToModel(fila);
+        Object valor = modeloAsignaciones.getValueAt(filaModelo, 5);
+        return valor != null ? valor.toString() : null;
+    }
+
+    private AsignacionAcademica buscarAsignacionPorId(String id) {
+        if (id == null) {
+            return null;
+        }
+        return catalogo.getAsignaciones().stream()
+                .filter(a -> id.equals(a.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
     private void agregarCampoFormulario(JPanel panel, GridBagConstraints gbc, int fila, String etiqueta, JComponent componente) {
         gbc.gridx = 0;
         gbc.gridy = fila;
@@ -837,5 +887,15 @@ public class PanelConfiguracion extends JPanel {
         gbc.gridx = 1;
         gbc.weightx = 1;
         panel.add(componente, gbc);
+    }
+
+    private void recargarDatos() {
+        cargarProfesoresEnTabla();
+        cargarGruposEnTabla();
+        cargarSalonesEnTabla();
+        cargarMateriasEnTabla();
+        cargarMateriasEnCombos();
+        cargarAsignacionesEnTabla();
+        refrescarCombosAsignaciones();
     }
 }

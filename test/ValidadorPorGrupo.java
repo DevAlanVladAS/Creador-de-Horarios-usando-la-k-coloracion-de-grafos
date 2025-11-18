@@ -1,4 +1,4 @@
-package src;
+package test;
 
 public class ValidadorPorGrupo implements Validador {
     private String tipoConflicto;

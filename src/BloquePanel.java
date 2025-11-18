@@ -18,24 +18,31 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
     public static final DataFlavor DATA_FLAVOR = new DataFlavor(BloqueHorario.class, "BloqueHorario");
 
     private static final Color[] PALETA = new Color[]{
-            new Color(88, 129, 234),
-            new Color(0, 172, 193),
-            new Color(255, 140, 66),
-            new Color(87, 75, 168),
+            new Color(244, 143, 177),
+            new Color(255, 167, 38),
+            new Color(102, 187, 106),
+            new Color(255, 202, 40),
+            new Color(171, 71, 188),
+            new Color(255, 112, 67),
             new Color(0, 150, 136),
-            new Color(156, 39, 176),
-            new Color(233, 152, 0),
-            new Color(46, 125, 50)
+            new Color(124, 179, 66)
     };
+    private static final Color COLOR_CABECERA_DIA = new Color(78, 115, 223);
     private static final Map<String, Color> COLORES_POR_PROFESOR = new HashMap<>();
 
     private final BloqueHorario bloque;
     private final Color baseColor;
+    private final boolean arrastrable;
     private boolean mergeTop;
     private boolean mergeBottom;
 
     public BloquePanel(BloqueHorario bloque) {
+        this(bloque, true);
+    }
+
+    public BloquePanel(BloqueHorario bloque, boolean habilitarArrastre) {
         this.bloque = bloque;
+        this.arrastrable = habilitarArrastre;
         this.baseColor = asignarColor(bloque.getProfesorId());
         setOpaque(false);
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -66,18 +73,34 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
             add(salonLabel);
         }
 
-        DragSource ds = new DragSource();
-        ds.createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_MOVE, this);
+        if (arrastrable) {
+            DragSource ds = new DragSource();
+            ds.createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_MOVE, this);
+        }
     }
 
     private Color asignarColor(String profesorId) {
         if (profesorId == null) {
             return new Color(120, 120, 120);
         }
-        return COLORES_POR_PROFESOR.computeIfAbsent(
-                profesorId,
-                id -> PALETA[COLORES_POR_PROFESOR.size() % PALETA.length]
-        );
+        return COLORES_POR_PROFESOR.computeIfAbsent(profesorId, id -> seleccionarColorDisponible());
+    }
+
+    private Color seleccionarColorDisponible() {
+        int offset = COLORES_POR_PROFESOR.size();
+        for (int i = 0; i < PALETA.length; i++) {
+            Color candidato = PALETA[(offset + i) % PALETA.length];
+            if (!esColorCabecera(candidato)) {
+                return candidato;
+            }
+        }
+        return COLOR_CABECERA_DIA.brighter();
+    }
+
+    private boolean esColorCabecera(Color color) {
+        return color.getRed() == COLOR_CABECERA_DIA.getRed()
+                && color.getGreen() == COLOR_CABECERA_DIA.getGreen()
+                && color.getBlue() == COLOR_CABECERA_DIA.getBlue();
     }
 
     public BloqueHorario getBloque() {
