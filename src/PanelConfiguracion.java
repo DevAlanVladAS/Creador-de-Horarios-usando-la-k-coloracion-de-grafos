@@ -2,409 +2,824 @@ package src;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.time.LocalTime;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.Vector;
 
 /**
- * Panel de configuración específico para la gestión de Profesores,
- * incluyendo Materia asignada y Horas de disponibilidad.
+ * Panel centralizado para administrar profesores, grupos, salones, materias y asignaciones.
  */
 public class PanelConfiguracion extends JPanel {
 
-    // Horario del director: de 7 AM a 3 PM
-    private final String[] HORAS_CLASE = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00"};
+    private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
     private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
-    
-    // Componentes del formulario
+    private final String[] HORAS_CLASE = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00"};
+
+    private JTable tablaProfesores;
+    private DefaultTableModel modeloProfesores;
     private JTextField txtNombreProfesor;
-    private JTextField txtMateriaAsignada;
-    private JTextField txtHorasSemanales;
+    private JComboBox<Materia> cmbMateriaProfesor;
+    private JSpinner spHorasProfesor;
     private JCheckBox[] checkDias;
     private JCheckBox[] checkHoras;
-    private List<JCheckBox> checkGrupos;
-    private JButton btnGuardarProfesor;
-    private JButton btnSinPreferencias;
-    
-    // Componentes de la tabla de gestión
-    private JTable tablaProfesores;
-    private DefaultTableModel modeloTabla;
-    private JDialog parentDialog; // Para cerrar el diálogo al guardar
+    private Profesor profesorEnEdicion;
 
-    // Estado de edición
-    private Profesor profesorEnEdicion = null;
+    private JTable tablaGrupos;
+    private DefaultTableModel modeloGrupos;
+    private JTextField txtNombreGrupo;
 
-    // Referencia al catálogo central
-    private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance(); 
+    private JTable tablaSalones;
+    private DefaultTableModel modeloSalones;
+    private JTextField txtNombreSalon;
+    private JSpinner spCapacidadSalon;
+
+    private JTable tablaMaterias;
+    private DefaultTableModel modeloMaterias;
+    private JTextField txtNombreMateria;
+    private JSpinner spHorasMateria;
+
+    private JTable tablaAsignaciones;
+    private DefaultTableModel modeloAsignaciones;
+    private JComboBox<GrupoEstudiantes> cmbGrupoAsignacion;
+    private JComboBox<Materia> cmbMateriaAsignacion;
+    private JComboBox<Profesor> cmbProfesorAsignacion;
+    private JComboBox<Salon> cmbSalonAsignacion;
+    private JSpinner spHorasAsignacion;
+    private AsignacionAcademica asignacionEnEdicion;
+    private JCheckBox chkMateriaLibre;
+
+    private Materia materiaEnEdicion;
+
+    private JDialog parentDialog;
 
     public PanelConfiguracion() {
-        setLayout(new BorderLayout());
-        setPreferredSize(new Dimension(850, 550));
+        setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JLabel lblTitulo = new JLabel("Gestión de Profesores (Recursos Centrales)", SwingConstants.CENTER);
-        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 18));
-        add(lblTitulo, BorderLayout.NORTH);
+        JLabel titulo = new JLabel("Catálogo de recursos académicos", SwingConstants.CENTER);
+        titulo.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        add(titulo, BorderLayout.NORTH);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPane.setResizeWeight(0.6); 
-        
-        splitPane.setLeftComponent(crearPanelListadoProfesores());
-        splitPane.setRightComponent(crearPanelFormulario());
-        
-        add(splitPane, BorderLayout.CENTER);
-        
-        // Cargar los datos existentes del catálogo al iniciar
-        cargarDatosTabla();
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("Profesores", crearPanelProfesores());
+        tabs.addTab("Grupos", crearPanelGrupos());
+        tabs.addTab("Salones", crearPanelSalones());
+        tabs.addTab("Materias", crearPanelMaterias());
+        tabs.addTab("Asignaciones", crearPanelAsignaciones());
+
+        add(tabs, BorderLayout.CENTER);
+
+        recargarDatos();
     }
-    
-    // ==========================================================
-    // CREACIÓN DE PANELES
-    // ==========================================================
 
-    private JPanel crearPanelListadoProfesores() {
-        JPanel panelListado = new JPanel(new BorderLayout(5, 5));
-        panelListado.setBorder(BorderFactory.createTitledBorder("Profesores Existentes en Catálogo"));
-        
-        String[] columnas = {"Nombre", "Materia", "Disponibilidad"};
-        modeloTabla = new DefaultTableModel(columnas, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+    public void setParentDialog(JDialog parentDialog) {
+        this.parentDialog = parentDialog;
+    }
+
+    // ----------------------------------------------------
+    // PROFESORES
+    // ----------------------------------------------------
+
+    private JPanel crearPanelProfesores() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        split.setResizeWeight(0.55);
+        split.setLeftComponent(crearListadoProfesores());
+        split.setRightComponent(crearFormularioProfesores());
+        panel.add(split, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel crearListadoProfesores() {
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder("Profesores registrados"));
+
+        String[] columnas = {"Nombre", "Materia", "Horas/semana"};
+        modeloProfesores = new DefaultTableModel(columnas, 0) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
         };
-        tablaProfesores = new JTable(modeloTabla);
+
+        tablaProfesores = new JTable(modeloProfesores);
         tablaProfesores.getTableHeader().setReorderingAllowed(false);
-        
-        panelListado.add(new JScrollPane(tablaProfesores), BorderLayout.CENTER);
-        
-        // Botones de Acción (Editar/Eliminar)
-        JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        panel.add(new JScrollPane(tablaProfesores), BorderLayout.CENTER);
+
+        JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton btnEditar = new JButton("Editar");
         JButton btnEliminar = new JButton("Eliminar");
-        
-        btnEliminar.addActionListener(e -> eliminarProfesorSeleccionado());
+
         btnEditar.addActionListener(e -> editarProfesorSeleccionado());
-        
-        panelAcciones.add(btnEditar);
-        panelAcciones.add(btnEliminar);
-        panelListado.add(panelAcciones, BorderLayout.SOUTH);
-        
-        return panelListado;
-    }
+        btnEliminar.addActionListener(e -> eliminarProfesorSeleccionado());
 
-    private JPanel crearPanelFormulario() {
-        JPanel panelFormulario = new JPanel(new BorderLayout(10, 10));
-        panelFormulario.setBorder(BorderFactory.createTitledBorder("Añadir Nuevo Profesor"));
-        
-        JPanel panelInputs = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.NORTHWEST;
+        acciones.add(btnEditar);
+        acciones.add(btnEliminar);
+        panel.add(acciones, BorderLayout.SOUTH);
 
-        // 1. Nombre del Profesor
-        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0;
-        panelInputs.add(new JLabel("Nombre:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        txtNombreProfesor = new JTextField(15);
-        panelInputs.add(txtNombreProfesor, gbc);
-        
-        // 2. Materia Asignada
-        gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0;
-        panelInputs.add(new JLabel("Materia:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        txtMateriaAsignada = new JTextField(15);
-        panelInputs.add(txtMateriaAsignada, gbc);
-        
-        // 3. Horas semanales
-        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0;
-        panelInputs.add(new JLabel("Horas por semana:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        txtHorasSemanales = new JTextField(5);
-        panelInputs.add(txtHorasSemanales, gbc);
-
-        // 4. Disponibilidad por Días (Checkboxes)
-        JPanel panelDias = crearPanelDisponibilidad(DIAS_SEMANA, "Días Disponibles", checkDias -> this.checkDias = checkDias);
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2; gbc.weighty = 0;
-        panelInputs.add(panelDias, gbc);
-        
-        // 5. Asignación de Grupos
-        JPanel panelGrupos = crearPanelGrupos();
-        gbc.gridy = 4;
-        panelInputs.add(panelGrupos, gbc);
-
-        // 6. Disponibilidad por Horas (Checkboxes)
-        JPanel panelHoras = crearPanelDisponibilidad(HORAS_CLASE, "Horas Disponibles (7h-15h)", checkHoras -> this.checkHoras = checkHoras);
-        gbc.gridy = 5; gbc.weighty = 1; // Permite que este panel ocupe el espacio restante
-        panelInputs.add(panelHoras, gbc);
-
-        panelFormulario.add(panelInputs, BorderLayout.NORTH);
-        
-        // 5. Botones de Acción (Guardar y Sin Preferencias)
-        JPanel panelBotonesAccion = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        
-        btnGuardarProfesor = new JButton("Guardar Profesor");
-        btnGuardarProfesor.addActionListener(e -> guardarProfesor());
-        
-        btnSinPreferencias = new JButton("Sin Preferencias (Todo el Horario)");
-        btnSinPreferencias.addActionListener(e -> setSinPreferencias());
-        
-        panelBotonesAccion.add(btnGuardarProfesor);
-        panelBotonesAccion.add(btnSinPreferencias);
-        panelFormulario.add(panelBotonesAccion, BorderLayout.SOUTH);
-
-        return panelFormulario;
-    }
-    
-    // Función auxiliar para crear paneles de checkboxes (Días u Horas)
-    private JPanel crearPanelDisponibilidad(String[] items, String titulo, java.util.function.Consumer<JCheckBox[]> setter) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder(titulo));
-        
-        JCheckBox[] checks = new JCheckBox[items.length];
-        for (int i = 0; i < items.length; i++) {
-            checks[i] = new JCheckBox(items[i], true);
-            panel.add(checks[i]);
-        }
-        setter.accept(checks); // Asigna los checks al campo de la clase (checkDias o checkHoras)
         return panel;
     }
 
-    private JPanel crearPanelGrupos() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        panel.setBorder(BorderFactory.createTitledBorder("Asignar a Grupos"));
-        checkGrupos = new ArrayList<>();
+    private JPanel crearFormularioProfesores() {
+        JPanel panel = new JPanel();
+        panel.setBorder(BorderFactory.createTitledBorder("Nuevo profesor"));
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 
-        List<GrupoEstudiantes> grupos = catalogo.getTodosLosGrupos();
-        if (grupos.isEmpty()) {
-            panel.add(new JLabel("No hay grupos creados."));
-        } else {
-            for (GrupoEstudiantes grupo : grupos) {
-                JCheckBox check = new JCheckBox(grupo.getNombre());
-                check.putClientProperty("grupoId", grupo.getId()); // Guardar ID para referencia
-                checkGrupos.add(check);
-                panel.add(check);
+        txtNombreProfesor = new JTextField(18);
+        cmbMateriaProfesor = new JComboBox<>();
+        cmbMateriaProfesor.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Materia) {
+                    setText(((Materia) value).getNombre());
+                } else {
+                    setText("Sin materia fija");
+                }
+                return this;
             }
-        }
+        });
+        spHorasProfesor = new JSpinner(new SpinnerNumberModel(5, 1, 30, 1));
+
+        checkDias = new JCheckBox[DIAS_SEMANA.length];
+        checkHoras = new JCheckBox[HORAS_CLASE.length];
+
+        panel.add(crearField("Nombre completo", txtNombreProfesor));
+        panel.add(crearField("Materia", cmbMateriaProfesor));
+        panel.add(crearField("Horas por semana", spHorasProfesor));
+
+        panel.add(crearPanelChecks("Días disponibles", DIAS_SEMANA, checkDias));
+        panel.add(crearPanelChecks("Horario disponible", HORAS_CLASE, checkHoras));
+
+        JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton btnPreferencias = new JButton("Disponibilidad completa");
+        btnPreferencias.addActionListener(e -> seleccionarTodos(checkDias, checkHoras));
+
+        JButton btnGuardar = new JButton("Guardar cambios");
+        btnGuardar.addActionListener(e -> guardarProfesor());
+
+        botones.add(btnPreferencias);
+        botones.add(btnGuardar);
+        panel.add(botones);
+
         return panel;
-    }
-
-    // ==========================================================
-    // LÓGICA DE DATOS Y ACCIÓN
-    // ==========================================================
-    
-    private void setSinPreferencias() {
-        // Deseleccionar todas las opciones (al guardarlo, se interpreta como disponibilidad total)
-        for (JCheckBox check : checkDias) {
-            check.setSelected(false);
-        }
-        for (JCheckBox check : checkHoras) {
-            check.setSelected(false);
-        }
-        JOptionPane.showMessageDialog(this, "Las preferencias han sido deseleccionadas.\nAl guardar, el profesor se considerará disponible todos los días y horas.", "Sin Preferencias", JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private void cargarDatosTabla() {
-        modeloTabla.setRowCount(0);
-        
-        // Cargar desde el catálogo central
-        for (Profesor p : catalogo.getTodosLosProfesores()) {
-            Vector<String> row = new Vector<>();
-            row.add(p.getNombre());
-            row.add(p.getMateriaAsignada());
-            
-            // Unir días y horas en una sola cadena de Disponibilidad
-            String diasStr = p.getDiasDisponibles().isEmpty() ? "Todos los días" : String.join(", ", p.getDiasDisponibles());
-            String horasStr = p.getHorasDisponibles().isEmpty() ? "Todas las horas" : String.join(", ", p.getHorasDisponibles());
-            
-            row.add(diasStr + " / " + horasStr);
-            
-            modeloTabla.addRow(row);
-        }
     }
 
     private void guardarProfesor() {
         String nombre = txtNombreProfesor.getText().trim();
-        String materia = txtMateriaAsignada.getText().trim();
-        
-        if (nombre.isEmpty() || materia.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Debe ingresar el nombre y la materia del profesor.", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        int horasSemanales;
-        try {
-            horasSemanales = Integer.parseInt(txtHorasSemanales.getText().trim());
-            if (horasSemanales <= 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Las horas por semana deben ser un número entero positivo.", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        List<String> diasSeleccionados = new ArrayList<>();
-        for (JCheckBox check : checkDias) {
-            if (check.isSelected()) {
-                diasSeleccionados.add(check.getText());
-            }
-        }
-        
-        List<String> horasSeleccionadas = new ArrayList<>();
-        for (JCheckBox check : checkHoras) {
-            if (check.isSelected()) {
-                horasSeleccionadas.add(check.getText());
-            }
-        }
-        
-        List<String> gruposSeleccionadosIds = checkGrupos.stream()
-            .filter(JCheckBox::isSelected)
-            .map(check -> (String) check.getClientProperty("grupoId"))
-            .collect(Collectors.toList());
+        Materia materia = (Materia) cmbMateriaProfesor.getSelectedItem();
+        int horas = (Integer) spHorasProfesor.getValue();
 
-        // --- VALIDACIÓN DE HORAS ---
-        // Cada bloque creado para un grupo cuenta como 1 hora.
-        int horasAsignadasPreviamente = 0;
-        if (profesorEnEdicion != null) {
-            // Al editar, no contamos los bloques que vamos a reemplazar.
-            // La validación se hace sobre el total de grupos seleccionados ahora.
-        }
-        int horasNuevas = gruposSeleccionadosIds.size();
-        if (horasAsignadasPreviamente + horasNuevas > horasSemanales) {
-            JOptionPane.showMessageDialog(this,
-                "Error: La asignación excede el límite de " + horasSemanales + " horas semanales del profesor.\n" +
-                "Horas actuales asignadas: " + horasAsignadasPreviamente + "\n" +
-                "Nuevas horas a asignar: " + horasNuevas,
-                "Límite de Horas Excedido", JOptionPane.ERROR_MESSAGE);
+        if (nombre.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese el nombre del profesor.", "Validación", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        // --- FIN VALIDACIÓN ---
 
-        if (profesorEnEdicion == null) { // Creando un nuevo profesor
-            Profesor nuevoProfesor = new Profesor(nombre, materia, diasSeleccionados, horasSeleccionadas, horasSemanales);
-            catalogo.addProfesor(nuevoProfesor);
-            crearBloquesParaProfesor(nuevoProfesor, gruposSeleccionadosIds);
-            JOptionPane.showMessageDialog(this, "Profesor '" + nombre + "' guardado y añadido al catálogo.", "Guardado Exitoso", JOptionPane.INFORMATION_MESSAGE);
-        } else { // Editando un profesor existente
+        List<String> dias = obtenerSeleccion(checkDias);
+        List<String> horasSeleccionadas = obtenerSeleccion(checkHoras);
+        String materiaNombre = materia != null ? materia.getNombre() : null;
+
+        if (profesorEnEdicion == null) {
+            Profesor profesor = new Profesor(nombre, materiaNombre, dias, horasSeleccionadas, horas);
+            catalogo.addProfesor(profesor);
+        } else {
             profesorEnEdicion.setNombre(nombre);
-            profesorEnEdicion.setMateriaAsignada(materia);
-            profesorEnEdicion.setHorasSemanales(horasSemanales);
-            profesorEnEdicion.setDiasDisponibles(diasSeleccionados);
+            profesorEnEdicion.setMateriaAsignada(materiaNombre);
+            profesorEnEdicion.setDiasDisponibles(dias);
             profesorEnEdicion.setHorasDisponibles(horasSeleccionadas);
-            
-            // Actualizar bloques: eliminar los viejos y crear los nuevos
-            catalogo.removeBloquesByProfesorId(profesorEnEdicion.getId());
-            crearBloquesParaProfesor(profesorEnEdicion, gruposSeleccionadosIds);
-            JOptionPane.showMessageDialog(this, "Profesor '" + nombre + "' actualizado.", "Actualización Exitosa", JOptionPane.INFORMATION_MESSAGE);
+            profesorEnEdicion.setHorasSemanales(horas);
+            profesorEnEdicion = null;
         }
 
-        // Refrescar la tabla y limpiar
-        cargarDatosTabla(); 
-        limpiarFormulario();
-
-        // Cerrar el diálogo si está en uno
-        if (parentDialog != null) {
-            parentDialog.dispose();
-        }
-    }
-
-    private void limpiarFormulario() {
-        txtNombreProfesor.setText("");
-        txtMateriaAsignada.setText("");
-        txtHorasSemanales.setText("");
-        for (JCheckBox check : checkDias) { check.setSelected(true); }
-        for (JCheckBox check : checkHoras) { check.setSelected(true); }
-        for (JCheckBox check : checkGrupos) { check.setSelected(false); }
-        profesorEnEdicion = null; // Salir del modo edición
-    }
-
-    private void crearBloquesParaProfesor(Profesor profesor, List<String> grupoIds) {
-        Salon salonEjemplo = catalogo.getTodosLosSalones().stream().findFirst().orElse(null);
-        if (salonEjemplo == null) {
-            // Opcional: Crear un salón por defecto si no existe
-            salonEjemplo = new Salon("Salon General", 30);
-            catalogo.addSalon(salonEjemplo);
-        }
-
-        for (String grupoId : grupoIds) {
-            // Creamos un bloque de 1 hora, la hora de inicio es un placeholder
-            BloqueHorario bloque = new BloqueHorario(
-                LocalTime.of(7, 0), LocalTime.of(8, 0),
-                profesor.getMateriaAsignada(),
-                profesor.getId(),
-                salonEjemplo.getId(),
-                grupoId,
-                true
-            );
- 
-            catalogo.addBloqueHorario(bloque);
-        }
+        limpiarFormularioProfesor();
+        cargarProfesoresEnTabla();
+        refrescarCombosAsignaciones();
     }
 
     private void eliminarProfesorSeleccionado() {
-        int filaSeleccionada = tablaProfesores.getSelectedRow();
-        
-        if (filaSeleccionada >= 0) {
-            String nombreProf = (String) modeloTabla.getValueAt(filaSeleccionada, 0); // Obtener el nombre
-            
-            int respuesta = JOptionPane.showConfirmDialog(this, 
-                "¿Está seguro de eliminar a '" + nombreProf + "' del catálogo?",
-                "Confirmar Eliminación", JOptionPane.YES_NO_OPTION);
-            
-            if (respuesta == JOptionPane.YES_OPTION) {
-                // Como no usamos ID en la tabla, necesitamos encontrar el profesor en el catálogo
-                Profesor profesorAEliminar = catalogo.getTodosLosProfesores().stream()
-                    .filter(p -> p.getNombre().equals(nombreProf))
-                    .findFirst().orElse(null);
-                
-                if (profesorAEliminar != null) {
-                    catalogo.removeProfesor(profesorAEliminar.getId());
-                    catalogo.removeBloquesByProfesorId(profesorAEliminar.getId()); // Eliminar sus bloques
-                    cargarDatosTabla(); // Refrescar la tabla
-                }
-            }
-        } else {
-            JOptionPane.showMessageDialog(this, "Por favor, seleccione un profesor de la tabla para eliminar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
-        }
+        int fila = tablaProfesores.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloProfesores.getValueAt(fila, 0);
+        Optional<Profesor> profesor = catalogo.getTodosLosProfesores().stream()
+                .filter(p -> p.getNombre().equals(nombre))
+                .findFirst();
+        profesor.ifPresent(p -> catalogo.removeProfesor(p.getId()));
+        cargarProfesoresEnTabla();
+        refrescarCombosAsignaciones();
     }
 
     private void editarProfesorSeleccionado() {
-        int filaSeleccionada = tablaProfesores.getSelectedRow();
-        if (filaSeleccionada < 0) {
-            JOptionPane.showMessageDialog(this, "Por favor, seleccione un profesor de la tabla para editar.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+        int fila = tablaProfesores.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloProfesores.getValueAt(fila, 0);
+        profesorEnEdicion = catalogo.getTodosLosProfesores().stream()
+                .filter(p -> p.getNombre().equals(nombre))
+                .findFirst()
+                .orElse(null);
+        if (profesorEnEdicion == null) {
+            return;
+        }
+        txtNombreProfesor.setText(profesorEnEdicion.getNombre());
+        seleccionarMateriaEnCombo(cmbMateriaProfesor, profesorEnEdicion.getMateriaAsignada());
+        spHorasProfesor.setValue(profesorEnEdicion.getHorasSemanales());
+        marcarSeleccion(checkDias, profesorEnEdicion.getDiasDisponibles());
+        marcarSeleccion(checkHoras, profesorEnEdicion.getHorasDisponibles());
+    }
+
+    private void limpiarFormularioProfesor() {
+        txtNombreProfesor.setText("");
+        if (cmbMateriaProfesor.getItemCount() > 0) {
+            cmbMateriaProfesor.setSelectedIndex(0);
+        }
+        spHorasProfesor.setValue(5);
+        seleccionarTodos(checkDias, true);
+        seleccionarTodos(checkHoras, true);
+    }
+
+    // ----------------------------------------------------
+    // GRUPOS
+    // ----------------------------------------------------
+
+    private JPanel crearPanelGrupos() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("Grupos escolares"));
+
+        modeloGrupos = new DefaultTableModel(new String[]{"Nombre del grupo"}, 0) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
+        };
+        tablaGrupos = new JTable(modeloGrupos);
+        tablaGrupos.getTableHeader().setReorderingAllowed(false);
+
+        panel.add(new JScrollPane(tablaGrupos), BorderLayout.CENTER);
+
+        JPanel formulario = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        txtNombreGrupo = new JTextField(15);
+        JButton btnAgregar = new JButton("Registrar grupo");
+        JButton btnEliminar = new JButton("Eliminar seleccionado");
+
+        btnAgregar.addActionListener(e -> guardarGrupo());
+        btnEliminar.addActionListener(e -> eliminarGrupoSeleccionado());
+
+        formulario.add(new JLabel("Nombre (p.e. 1°B):"));
+        formulario.add(txtNombreGrupo);
+        formulario.add(btnAgregar);
+        formulario.add(btnEliminar);
+        panel.add(formulario, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void guardarGrupo() {
+        String nombre = txtNombreGrupo.getText().trim();
+        if (nombre.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nombre de grupo vacío.", "Validación", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        GrupoEstudiantes grupo = new GrupoEstudiantes(nombre);
+        catalogo.addGrupo(grupo);
+        txtNombreGrupo.setText("");
+        cargarGruposEnTabla();
+        refrescarCombosAsignaciones();
+    }
+
+    private void eliminarGrupoSeleccionado() {
+        int fila = tablaGrupos.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloGrupos.getValueAt(fila, 0);
+        catalogo.findGrupoByName(nombre).ifPresent(g -> catalogo.removeGrupo(g.getId()));
+        cargarGruposEnTabla();
+        refrescarCombosAsignaciones();
+    }
+
+    // ----------------------------------------------------
+    // SALONES
+    // ----------------------------------------------------
+
+    private JPanel crearPanelSalones() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("Salones de clase"));
+
+        modeloSalones = new DefaultTableModel(new String[]{"Nombre", "Capacidad"}, 0) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
+        };
+        tablaSalones = new JTable(modeloSalones);
+        panel.add(new JScrollPane(tablaSalones), BorderLayout.CENTER);
+
+        JPanel formulario = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        txtNombreSalon = new JTextField(12);
+        spCapacidadSalon = new JSpinner(new SpinnerNumberModel(30, 5, 60, 1));
+
+        JButton btnAgregar = new JButton("Agregar salón");
+        JButton btnEliminar = new JButton("Eliminar seleccionado");
+
+        btnAgregar.addActionListener(e -> guardarSalon());
+        btnEliminar.addActionListener(e -> eliminarSalonSeleccionado());
+
+        formulario.add(new JLabel("Nombre:"));
+        formulario.add(txtNombreSalon);
+        formulario.add(new JLabel("Capacidad:"));
+        formulario.add(spCapacidadSalon);
+        formulario.add(btnAgregar);
+        formulario.add(btnEliminar);
+
+        panel.add(formulario, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void guardarSalon() {
+        String nombre = txtNombreSalon.getText().trim();
+        int capacidad = (Integer) spCapacidadSalon.getValue();
+        if (nombre.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese un nombre para el salón.", "Validación", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        catalogo.addSalon(new Salon(nombre, capacidad));
+        txtNombreSalon.setText("");
+        spCapacidadSalon.setValue(30);
+        cargarSalonesEnTabla();
+        refrescarCombosAsignaciones();
+    }
+
+    private void eliminarSalonSeleccionado() {
+        int fila = tablaSalones.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloSalones.getValueAt(fila, 0);
+        catalogo.findSalonByName(nombre).ifPresent(s -> catalogo.removeSalon(s.getId()));
+        cargarSalonesEnTabla();
+        refrescarCombosAsignaciones();
+    }
+
+    // ----------------------------------------------------
+    // MATERIAS
+    // ----------------------------------------------------
+
+    private JPanel crearPanelMaterias() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("Materias disponibles"));
+
+        modeloMaterias = new DefaultTableModel(new String[]{"Nombre", "Horas sugeridas"}, 0) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
+        };
+        tablaMaterias = new JTable(modeloMaterias);
+        panel.add(new JScrollPane(tablaMaterias), BorderLayout.CENTER);
+
+        JPanel formulario = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        txtNombreMateria = new JTextField(15);
+        spHorasMateria = new JSpinner(new SpinnerNumberModel(3, 1, 10, 1));
+        JButton btnGuardar = new JButton("Guardar / Actualizar");
+        JButton btnEditar = new JButton("Editar seleccionada");
+        JButton btnEliminar = new JButton("Eliminar seleccionada");
+        JButton btnLimpiar = new JButton("Limpiar");
+
+        btnGuardar.addActionListener(e -> guardarOModificarMateria());
+        btnEditar.addActionListener(e -> editarMateriaSeleccionada());
+        btnEliminar.addActionListener(e -> eliminarMateriaSeleccionada());
+        btnLimpiar.addActionListener(e -> limpiarFormularioMateria());
+
+        formulario.add(new JLabel("Materia:"));
+        formulario.add(txtNombreMateria);
+        formulario.add(new JLabel("Horas sugeridas:"));
+        formulario.add(spHorasMateria);
+        formulario.add(btnGuardar);
+        formulario.add(btnEditar);
+        formulario.add(btnEliminar);
+        formulario.add(btnLimpiar);
+
+        panel.add(formulario, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void guardarOModificarMateria() {
+        String nombre = txtNombreMateria.getText().trim();
+        int horas = (Integer) spHorasMateria.getValue();
+        if (nombre.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese el nombre de la materia.", "Validación", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (materiaEnEdicion == null) {
+            Materia existente = catalogo.findMateriaByName(nombre).orElse(null);
+            if (existente != null) {
+                catalogo.actualizarHorasMateria(existente.getId(), horas);
+            } else {
+                Materia nueva = new Materia(nombre, horas);
+                catalogo.addMateria(nueva);
+            }
+        } else {
+            catalogo.actualizarHorasMateria(materiaEnEdicion.getId(), horas);
+        }
+        limpiarFormularioMateria();
+        cargarMateriasEnTabla();
+        cargarMateriasEnCombos();
+    }
+
+    private void eliminarMateriaSeleccionada() {
+        int fila = tablaMaterias.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloMaterias.getValueAt(fila, 0);
+        catalogo.findMateriaByName(nombre).ifPresent(m -> catalogo.removeMateria(m.getId()));
+        if (materiaEnEdicion != null && materiaEnEdicion.getNombre().equalsIgnoreCase(nombre)) {
+            limpiarFormularioMateria();
+        }
+        cargarMateriasEnTabla();
+        cargarMateriasEnCombos();
+    }
+
+    private void editarMateriaSeleccionada() {
+        int fila = tablaMaterias.getSelectedRow();
+        if (fila < 0) return;
+        String nombre = (String) modeloMaterias.getValueAt(fila, 0);
+        materiaEnEdicion = catalogo.findMateriaByName(nombre).orElse(null);
+        if (materiaEnEdicion != null) {
+            txtNombreMateria.setText(materiaEnEdicion.getNombre());
+            txtNombreMateria.setEnabled(false);
+            spHorasMateria.setValue(materiaEnEdicion.getHorasSugeridas());
+        }
+    }
+
+    private void limpiarFormularioMateria() {
+        materiaEnEdicion = null;
+        txtNombreMateria.setText("");
+        txtNombreMateria.setEnabled(true);
+        spHorasMateria.setValue(3);
+    }
+
+    // ----------------------------------------------------
+    // ASIGNACIONES
+    // ----------------------------------------------------
+
+    private JPanel crearPanelAsignaciones() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+
+        modeloAsignaciones = new DefaultTableModel(new String[]{"Grupo", "Materia", "Profesor", "Horas", "Salón", "ID"}, 0) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
+        };
+        tablaAsignaciones = new JTable(modeloAsignaciones);
+        tablaAsignaciones.getTableHeader().setReorderingAllowed(false);
+        tablaAsignaciones.removeColumn(tablaAsignaciones.getColumnModel().getColumn(5));
+
+        panel.add(new JScrollPane(tablaAsignaciones), BorderLayout.CENTER);
+
+        JPanel formulario = new JPanel(new GridBagLayout());
+        formulario.setBorder(BorderFactory.createTitledBorder("Crear o actualizar asignación"));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        chkMateriaLibre = new JCheckBox("Permitir materia distinta al profesor");
+        chkMateriaLibre.addActionListener(e -> actualizarMateriaPorProfesor());
+
+        cmbGrupoAsignacion = new JComboBox<>();
+        cmbMateriaAsignacion = new JComboBox<>();
+        cmbProfesorAsignacion = new JComboBox<>();
+        cmbProfesorAsignacion.addActionListener(e -> actualizarMateriaPorProfesor());
+        cmbSalonAsignacion = new JComboBox<>();
+        cmbSalonAsignacion.addItem(null); // Opción sin salón
+        cmbSalonAsignacion.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Salon) {
+                    setText(((Salon) value).getNombre());
+                } else {
+                    setText("Sin salón fijo");
+                }
+                return this;
+            }
+        });
+        spHorasAsignacion = new JSpinner(new SpinnerNumberModel(5, 1, 20, 1));
+        chkMateriaLibre = new JCheckBox("Permitir materia distinta al profesor");
+        chkMateriaLibre.addActionListener(e -> actualizarMateriaPorProfesor());
+
+        int fila = 0;
+        agregarCampoFormulario(formulario, gbc, fila++, "Grupo:", cmbGrupoAsignacion);
+        agregarCampoFormulario(formulario, gbc, fila++, "Materia:", cmbMateriaAsignacion);
+        agregarCampoFormulario(formulario, gbc, fila++, "Profesor:", cmbProfesorAsignacion);
+        agregarCampoFormulario(formulario, gbc, fila++, "Salón:", cmbSalonAsignacion);
+        agregarCampoFormulario(formulario, gbc, fila++, "Horas a la semana:", spHorasAsignacion);
+
+        gbc.gridx = 0;
+        gbc.gridy = fila++;
+        gbc.gridwidth = 2;
+        formulario.add(chkMateriaLibre, gbc);
+
+        JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnGuardar = new JButton("Guardar asignación");
+        JButton btnEditar = new JButton("Editar seleccionada");
+        JButton btnEliminar = new JButton("Eliminar seleccionada");
+
+        btnGuardar.addActionListener(e -> guardarAsignacion());
+        btnEditar.addActionListener(e -> editarAsignacionSeleccionada());
+        btnEliminar.addActionListener(e -> eliminarAsignacionSeleccionada());
+
+        botones.add(btnGuardar);
+        botones.add(btnEditar);
+        botones.add(btnEliminar);
+
+        gbc.gridx = 0;
+        gbc.gridy = fila;
+        gbc.gridwidth = 2;
+        formulario.add(botones, gbc);
+
+        panel.add(formulario, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void guardarAsignacion() {
+        GrupoEstudiantes grupo = (GrupoEstudiantes) cmbGrupoAsignacion.getSelectedItem();
+        Materia materia = (Materia) cmbMateriaAsignacion.getSelectedItem();
+        Profesor profesor = (Profesor) cmbProfesorAsignacion.getSelectedItem();
+        Salon salon = (Salon) cmbSalonAsignacion.getSelectedItem();
+        int horas = (Integer) spHorasAsignacion.getValue();
+
+        if (grupo == null || profesor == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione grupo y profesor.", "Validación", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (materia == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione una materia válida.", "Validación", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        String nombreProf = (String) modeloTabla.getValueAt(filaSeleccionada, 0);
-        profesorEnEdicion = catalogo.findProfesorByName(nombreProf).orElse(null);
+        if (asignacionEnEdicion != null) {
+            catalogo.removeAsignacion(asignacionEnEdicion.getId());
+            asignacionEnEdicion = null;
+        }
 
-        if (profesorEnEdicion != null) {
-            // Cargar datos en el formulario
-            txtNombreProfesor.setText(profesorEnEdicion.getNombre());
-            txtMateriaAsignada.setText(profesorEnEdicion.getMateriaAsignada());
-            txtHorasSemanales.setText(String.valueOf(profesorEnEdicion.getHorasSemanales()));
+        AsignacionAcademica asignacion = new AsignacionAcademica(
+                grupo.getId(),
+                profesor.getId(),
+                materia.getId(),
+                salon != null ? salon.getId() : null,
+                horas
+        );
+        catalogo.addAsignacionAcademica(asignacion);
 
-            // Marcar disponibilidad de días y horas
-            List<String> diasDisp = profesorEnEdicion.getDiasDisponibles();
-            for (JCheckBox check : checkDias) {
-                check.setSelected(diasDisp.contains(check.getText()));
-            }
-            List<String> horasDisp = profesorEnEdicion.getHorasDisponibles();
-            for (JCheckBox check : checkHoras) {
-                check.setSelected(horasDisp.contains(check.getText()));
-            }
+        spHorasAsignacion.setValue(5);
+        chkMateriaLibre.setSelected(false);
+        actualizarMateriaPorProfesor();
+        cargarAsignacionesEnTabla();
+    }
 
-            // Marcar grupos asignados
-            List<String> gruposAsignadosIds = catalogo.getBloquesByProfesorId(profesorEnEdicion.getId())
-                .stream().map(BloqueHorario::getGrupoId).distinct().collect(Collectors.toList());
-            for (JCheckBox check : checkGrupos) {
-                String grupoId = (String) check.getClientProperty("grupoId");
-                check.setSelected(gruposAsignadosIds.contains(grupoId));
+    private void editarAsignacionSeleccionada() {
+        int fila = tablaAsignaciones.getSelectedRow();
+        if (fila < 0) return;
+        String id = (String) modeloAsignaciones.getValueAt(fila, 5);
+        asignacionEnEdicion = catalogo.getAsignaciones().stream()
+                .filter(a -> a.getId().equals(id))
+                .findFirst()
+                .orElse(null);
+        if (asignacionEnEdicion == null) {
+            return;
+        }
+        seleccionarElemento(cmbGrupoAsignacion, asignacionEnEdicion.getGrupoId());
+        seleccionarElemento(cmbProfesorAsignacion, asignacionEnEdicion.getProfesorId());
+        actualizarMateriaPorProfesor();
+        seleccionarElemento(cmbMateriaAsignacion, asignacionEnEdicion.getMateriaId());
+        seleccionarElemento(cmbSalonAsignacion, asignacionEnEdicion.getSalonId());
+        Materia materia = catalogo.obtenerMateriaPorId(asignacionEnEdicion.getMateriaId());
+        Profesor profesor = catalogo.obtenerProfesorPorId(asignacionEnEdicion.getProfesorId());
+        chkMateriaLibre.setSelected(false);
+        if (profesor == null || profesor.getMateriaAsignada() == null || materia == null ||
+                !profesor.getMateriaAsignada().equalsIgnoreCase(materia.getNombre())) {
+            chkMateriaLibre.setSelected(true);
+            cmbMateriaAsignacion.setEnabled(true);
+        } else {
+            cmbMateriaAsignacion.setEnabled(false);
+        }
+        spHorasAsignacion.setValue(asignacionEnEdicion.getHorasSemanales());
+    }
+
+    private void eliminarAsignacionSeleccionada() {
+        int fila = tablaAsignaciones.getSelectedRow();
+        if (fila < 0) return;
+        String id = (String) modeloAsignaciones.getValueAt(fila, 5);
+        catalogo.removeAsignacion(id);
+        cargarAsignacionesEnTabla();
+    }
+
+    // ----------------------------------------------------
+    // CARGA DE DATOS
+    // ----------------------------------------------------
+
+    private void recargarDatos() {
+        cargarMateriasEnCombos();
+        cargarProfesoresEnTabla();
+        cargarGruposEnTabla();
+        cargarSalonesEnTabla();
+        cargarMateriasEnTabla();
+        refrescarCombosAsignaciones();
+        cargarAsignacionesEnTabla();
+    }
+
+    private void cargarProfesoresEnTabla() {
+        modeloProfesores.setRowCount(0);
+        for (Profesor profesor : catalogo.getTodosLosProfesores()) {
+            modeloProfesores.addRow(new Object[]{
+                    profesor.getNombre(),
+                    profesor.getMateriaAsignada(),
+                    profesor.getHorasSemanales()
+            });
+        }
+    }
+
+    private void cargarGruposEnTabla() {
+        modeloGrupos.setRowCount(0);
+        for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
+            modeloGrupos.addRow(new Object[]{grupo.getNombre()});
+        }
+    }
+
+    private void cargarSalonesEnTabla() {
+        modeloSalones.setRowCount(0);
+        for (Salon salon : catalogo.getTodosLosSalones()) {
+            modeloSalones.addRow(new Object[]{salon.getNombre(), salon.getCapacidad()});
+        }
+    }
+
+    private void cargarMateriasEnTabla() {
+        modeloMaterias.setRowCount(0);
+        for (Materia materia : catalogo.getTodasLasMaterias()) {
+            modeloMaterias.addRow(new Object[]{materia.getNombre(), materia.getHorasSugeridas()});
+        }
+    }
+
+    private void cargarMateriasEnCombos() {
+        if (cmbMateriaProfesor == null || cmbMateriaAsignacion == null) return;
+        cmbMateriaProfesor.removeAllItems();
+        cmbMateriaAsignacion.removeAllItems();
+        cmbMateriaProfesor.addItem(null);
+        for (Materia materia : catalogo.getTodasLasMaterias()) {
+            cmbMateriaProfesor.addItem(materia);
+            cmbMateriaAsignacion.addItem(materia);
+        }
+        actualizarMateriaPorProfesor();
+    }
+
+    private void refrescarCombosAsignaciones() {
+        if (cmbGrupoAsignacion == null || cmbMateriaAsignacion == null || cmbProfesorAsignacion == null || cmbSalonAsignacion == null) {
+            return;
+        }
+        cmbGrupoAsignacion.removeAllItems();
+        for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
+            cmbGrupoAsignacion.addItem(grupo);
+        }
+
+        cmbProfesorAsignacion.removeAllItems();
+        for (Profesor profesor : catalogo.getTodosLosProfesores()) {
+            cmbProfesorAsignacion.addItem(profesor);
+        }
+
+        cmbSalonAsignacion.removeAllItems();
+        cmbSalonAsignacion.addItem(null);
+        for (Salon salon : catalogo.getTodosLosSalones()) {
+            cmbSalonAsignacion.addItem(salon);
+        }
+        actualizarMateriaPorProfesor();
+    }
+
+    private void cargarAsignacionesEnTabla() {
+        modeloAsignaciones.setRowCount(0);
+        for (AsignacionAcademica asignacion : catalogo.getAsignaciones()) {
+            GrupoEstudiantes grupo = catalogo.obtenerGrupoPorId(asignacion.getGrupoId());
+            Materia materia = catalogo.obtenerMateriaPorId(asignacion.getMateriaId());
+            Profesor profesor = catalogo.obtenerProfesorPorId(asignacion.getProfesorId());
+            Salon salon = asignacion.getSalonId() != null ? catalogo.obtenerSalonPorId(asignacion.getSalonId()) : null;
+
+            modeloAsignaciones.addRow(new Object[]{
+                    grupo != null ? grupo.getNombre() : "(Grupo eliminado)",
+                    materia != null ? materia.getNombre() : "(Materia eliminada)",
+                    profesor != null ? profesor.getNombre() : "(Profesor eliminado)",
+                    asignacion.getHorasSemanales(),
+                    salon != null ? salon.getNombre() : "Libre",
+                    asignacion.getId()
+            });
+        }
+    }
+
+    private void actualizarMateriaPorProfesor() {
+        if (cmbMateriaAsignacion == null || cmbProfesorAsignacion == null) {
+            return;
+        }
+        Profesor profesor = (Profesor) cmbProfesorAsignacion.getSelectedItem();
+        if (profesor == null) {
+            cmbMateriaAsignacion.setEnabled(true);
+            return;
+        }
+        if (chkMateriaLibre != null && chkMateriaLibre.isSelected()) {
+            cmbMateriaAsignacion.setEnabled(true);
+            return;
+        }
+        String materiaNombre = profesor.getMateriaAsignada();
+        if (materiaNombre == null || materiaNombre.isBlank()) {
+            cmbMateriaAsignacion.setEnabled(true);
+            return;
+        }
+        Materia materia = catalogo.findMateriaByName(materiaNombre).orElse(null);
+        if (materia != null) {
+            seleccionarElemento(cmbMateriaAsignacion, materia.getId());
+            cmbMateriaAsignacion.setEnabled(false);
+        } else {
+            cmbMateriaAsignacion.setEnabled(true);
+        }
+    }
+
+    // ----------------------------------------------------
+    // UTILIDADES
+    // ----------------------------------------------------
+
+    private JPanel crearField(String etiqueta, JComponent componente) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panel.add(new JLabel(etiqueta + ":"));
+        panel.add(componente);
+        return panel;
+    }
+
+    private JPanel crearPanelChecks(String titulo, String[] valores, JCheckBox[] destino) {
+        JPanel panel = new JPanel(new GridLayout(0, 3, 5, 2));
+        panel.setBorder(BorderFactory.createTitledBorder(titulo));
+        for (int i = 0; i < valores.length; i++) {
+            destino[i] = new JCheckBox(valores[i], true);
+            panel.add(destino[i]);
+        }
+        return panel;
+    }
+
+    private List<String> obtenerSeleccion(JCheckBox[] checks) {
+        return Arrays.stream(checks)
+                .filter(JCheckBox::isSelected)
+                .map(AbstractButton::getText)
+                .collect(Collectors.toList());
+    }
+
+    private void seleccionarTodos(JCheckBox[] checks, boolean estado) {
+        Arrays.stream(checks).forEach(c -> c.setSelected(estado));
+    }
+
+    private void seleccionarTodos(JCheckBox[] dias, JCheckBox[] horas) {
+        seleccionarTodos(dias, true);
+        seleccionarTodos(horas, true);
+    }
+
+    private void marcarSeleccion(JCheckBox[] checks, List<String> valores) {
+        if (valores == null || valores.isEmpty()) {
+            seleccionarTodos(checks, true);
+            return;
+        }
+        for (JCheckBox check : checks) {
+            check.setSelected(valores.contains(check.getText()));
+        }
+    }
+
+    private void seleccionarMateriaEnCombo(JComboBox<Materia> combo, String nombreMateria) {
+        if (nombreMateria == null || nombreMateria.isBlank()) {
+            if (combo.getItemCount() > 0) combo.setSelectedIndex(0);
+            return;
+        }
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            Materia materia = combo.getItemAt(i);
+            if (materia.getNombre().equalsIgnoreCase(nombreMateria)) {
+                combo.setSelectedIndex(i);
+                return;
             }
         }
     }
 
-    public void setParentDialog(JDialog dialog) {
-        this.parentDialog = dialog;
+    private void seleccionarElemento(JComboBox<?> combo, String id) {
+        if (combo.getItemCount() == 0) {
+            return;
+        }
+        if (id == null) {
+            combo.setSelectedIndex(0);
+            return;
+        }
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            Object elemento = combo.getItemAt(i);
+            if (elemento instanceof GrupoEstudiantes && ((GrupoEstudiantes) elemento).getId().equals(id)) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+            if (elemento instanceof Materia && ((Materia) elemento).getId().equals(id)) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+            if (elemento instanceof Profesor && ((Profesor) elemento).getId().equals(id)) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+            if (elemento instanceof Salon && ((Salon) elemento).getId().equals(id)) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+        combo.setSelectedIndex(0);
+    }
+
+    private void agregarCampoFormulario(JPanel panel, GridBagConstraints gbc, int fila, String etiqueta, JComponent componente) {
+        gbc.gridx = 0;
+        gbc.gridy = fila;
+        gbc.weightx = 0;
+        panel.add(new JLabel(etiqueta), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1;
+        panel.add(componente, gbc);
     }
 }
+

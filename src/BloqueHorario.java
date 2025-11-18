@@ -119,6 +119,12 @@ public class BloqueHorario implements HorarioComponente, java.io.Serializable {
         this.horaFin = horaFin;
     }
 
+    public void actualizarIntervalo(LocalTime inicio, LocalTime fin) {
+        validarIntervalo(inicio, fin);
+        this.horaInicio = inicio;
+        this.horaFin = fin;
+    }
+
     public Duration getDuracion() {
         return Duration.between(horaInicio, horaFin);
     }
@@ -158,7 +164,7 @@ public class BloqueHorario implements HorarioComponente, java.io.Serializable {
      * @return true si los intervalos se solapan
      */
     public boolean seSolapaCon(BloqueHorario b2) {
-        return !(this.horaFin.isBefore(b2.horaInicio) || this.horaInicio.isAfter(b2.horaFin));
+        return this.horaInicio.isBefore(b2.horaFin) && b2.horaInicio.isBefore(this.horaFin);
     }
 
     

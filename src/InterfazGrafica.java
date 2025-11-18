@@ -1,18 +1,13 @@
-
 package src;
 
 import java.awt.*;
 import javax.swing.*;
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * InterfazGrafica: Contenedor principal del JFrame.
- * Versión moderna con diseño profesional para gestión de horarios.
+ * Ventana principal para la gestion visual de horarios.
  */
 public class InterfazGrafica extends JFrame {
-
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -20,7 +15,7 @@ public class InterfazGrafica extends JFrame {
             frame.setVisible(true);
         });
     }
-    // --- Componentes principales ---
+
     private JTabbedPane tabbedPanelHorarios;
     private JButton btnNuevoGrupo;
     private JButton btnCrearHorario;
@@ -28,14 +23,19 @@ public class InterfazGrafica extends JFrame {
     private JButton btnExportar;
     private JButton btnImportar;
 
-    // Panel de estado
+    private static final Color COLOR_FONDO = new Color(245, 248, 255);
+    private static final Color COLOR_ACCION_PRINCIPAL = new Color(76, 110, 245);
+    private static final Color COLOR_ACCION_SECUNDARIA = new Color(0, 172, 193);
+    private static final Color COLOR_ACCION_ALERTA = new Color(255, 140, 66);
+    private static final Color COLOR_ACCION_DORADO = new Color(255, 196, 0);
+    private static final Color COLOR_ACCION_VIOLETA = new Color(111, 66, 193);
+
     private JLabel lblEstado;
 
-    // Referencia al catálogo central
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
 
     public InterfazGrafica() {
-        setTitle("Creador de Horarios - K-Coloración de Grafos");
+        setTitle("Creador de Horarios - K-Coloracion de Grafos");
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(1200, 700));
         setLocationRelativeTo(null);
@@ -43,14 +43,11 @@ public class InterfazGrafica extends JFrame {
 
         initComponents();
 
-        // Eliminar cualquier profesor llamado o con materia 'algebra' si existe
-        // (petición del usuario)
         catalogo.getTodosLosProfesores().stream()
                 .filter(p -> "algebra".equalsIgnoreCase(p.getNombre())
                         || "algebra".equalsIgnoreCase(p.getMateriaAsignada()))
                 .forEach(p -> catalogo.removeProfesor(p.getId()));
 
-        // Mostrar placeholder si no hay grupos/profesores aún
         if (catalogo.getTodosLosGrupos().isEmpty()) {
             mostrarPlaceholderCrearHorario();
         } else {
@@ -65,67 +62,60 @@ public class InterfazGrafica extends JFrame {
         }
     }
 
-    /** Agrega una nueva pestaña con un PanelHorario para un grupo específico. */
     private void agregarPestanaHorario(GrupoEstudiantes grupo) {
-        PanelHorario nuevoHorario = new PanelHorario();
-
-        // Cargar los bloques que pertenecen a este grupo desde el catálogo central
+        PanelHorario panel = new PanelHorario();
         List<BloqueHorario> bloquesDelGrupo = catalogo.getBloquesByGrupoId(grupo.getId());
-        nuevoHorario.cargarBloques(bloquesDelGrupo);
-
-        tabbedPanelHorarios.addTab(grupo.getNombre(), nuevoHorario);
+        panel.cargarBloques(bloquesDelGrupo);
+        tabbedPanelHorarios.addTab(grupo.getNombre(), panel);
     }
 
-    // --- MÉTODOS DE ACCIÓN ---
-
-    private void onConfiguracion() {
-        // Abrir diálogo para agregar profesor
-        mostrarDialogoAgregarProfesor();
+    private void abrirCatalogoRecursos() {
+        mostrarDialogoCatalogoRecursos();
     }
 
     private void onNuevoGrupo() {
-        // Acción de 'Nuevo Grupo'
-        String nombreGrupo = JOptionPane.showInputDialog(this, "Ingrese el nombre del nuevo grupo (e.g., 1B, 3A):",
+        String nombreGrupo = JOptionPane.showInputDialog(this,
+                "Ingrese el nombre del nuevo grupo (e.g., 1B, 3A):",
                 "Nuevo Grupo", JOptionPane.PLAIN_MESSAGE);
 
         if (nombreGrupo != null && !nombreGrupo.trim().isEmpty()) {
             GrupoEstudiantes nuevoGrupo = new GrupoEstudiantes(nombreGrupo.trim());
             catalogo.addGrupo(nuevoGrupo);
-
-            // Reconstruir pestañas desde el catálogo (remueve placeholder si existía)
             cargarPestanasDeGrupos();
             tabbedPanelHorarios.setSelectedIndex(tabbedPanelHorarios.getTabCount() - 1);
         }
     }
 
     private void onCrearHorario() {
-        // Acción de 'Crear Horario'
         if (tabbedPanelHorarios.getTabCount() == 0) {
-            JOptionPane.showMessageDialog(this, "No hay grupos creados para generar un horario.", "Advertencia",
-                    JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "No hay grupos creados para generar un horario.",
+                    "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        String grupoSeleccionado = tabbedPanelHorarios.getTitleAt(tabbedPanelHorarios.getSelectedIndex());
+        String grupoSeleccionado = tabbedPanelHorarios.getTitleAt(
+                tabbedPanelHorarios.getSelectedIndex());
 
         JOptionPane.showMessageDialog(this,
-                "Ejecutando K-Coloración para el grupo: " + grupoSeleccionado + "...",
-                "Generando Horario", JOptionPane.INFORMATION_MESSAGE);
+                "Ejecutando k-coloracion para el grupo: " + grupoSeleccionado + "...",
+                "Generando horario", JOptionPane.INFORMATION_MESSAGE);
 
-        lblEstado.setText("Estado: Horario generado para " + grupoSeleccionado);
+        lblEstado.setText("Estado: horario generado para " + grupoSeleccionado);
     }
 
     private void onExportar() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad de exportación en desarrollo.", "Exportar",
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this,
+                "Funcionalidad de exportacion en desarrollo.",
+                "Exportar", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void onImportar() {
-        JOptionPane.showMessageDialog(this, "Funcionalidad de importación en desarrollo.", "Importar",
-                JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this,
+                "Funcionalidad de importacion en desarrollo.",
+                "Importar", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    /** Muestra un placeholder en la pestaña cuando no hay grupos/profesores. */
     private void mostrarPlaceholderCrearHorario() {
         tabbedPanelHorarios.removeAll();
         JPanel panel = new JPanel();
@@ -133,22 +123,24 @@ public class InterfazGrafica extends JFrame {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
 
-        JLabel title = new JLabel("Crear horario");
+        JLabel title = new JLabel("Comienza configurando tu escuela");
         title.setFont(new Font("Segoe UI", Font.BOLD, 28));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel subtitle = new JLabel(
-                "Aún no hay grupos ni profesores. Agrega un profesor y crea un grupo para comenzar.");
+                "<html>Aun no hay recursos registrados.<br/>"
+                        + "Abre el catalogo para dar de alta grupos, materias y profesores "
+                        + "y despues genera los 5 bloques estandar.</html>");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JButton btnCrear = new JButton("Crear Grupo");
+        JButton btnCrear = new JButton("Agregar grupo");
         btnCrear.setAlignmentX(Component.CENTER_ALIGNMENT);
         btnCrear.addActionListener(e -> onNuevoGrupo());
 
-        JButton btnAgregarProfesor = new JButton("Agregar Profesor");
-        btnAgregarProfesor.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btnAgregarProfesor.addActionListener(e -> mostrarDialogoAgregarProfesor());
+        JButton btnCatalogo = new JButton("Abrir catalogo");
+        btnCatalogo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btnCatalogo.addActionListener(e -> mostrarDialogoCatalogoRecursos());
 
         panel.add(Box.createVerticalGlue());
         panel.add(title);
@@ -157,50 +149,39 @@ public class InterfazGrafica extends JFrame {
         panel.add(Box.createRigidArea(new Dimension(0, 20)));
         panel.add(btnCrear);
         panel.add(Box.createRigidArea(new Dimension(0, 8)));
-        panel.add(btnAgregarProfesor);
+        panel.add(btnCatalogo);
         panel.add(Box.createVerticalGlue());
 
         tabbedPanelHorarios.addTab("Inicio", panel);
     }
 
-    /** Diálogo modal para agregar un profesor al catálogo. */
-    private void mostrarDialogoAgregarProfesor() {
-        // Mostrar el PanelConfiguracion dentro de un diálogo modal (vuelve a la
-        // interfaz anterior)
-        JDialog dialog = new JDialog(this, "Gestión de Profesores", true);
+    private void mostrarDialogoCatalogoRecursos() {
+        JDialog dialog = new JDialog(this, "Catalogo de recursos", true);
         PanelConfiguracion panelConfig = new PanelConfiguracion();
         panelConfig.setParentDialog(dialog);
         dialog.getContentPane().add(panelConfig);
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
-
-        // Al cerrar el diálogo de configuración, refrescar los horarios por si hubo cambios
         cargarPestanasDeGrupos();
     }
 
     private void initComponents() {
-        // Crear la barra de menú
         JMenuBar menuBar = crearMenuBar();
         setJMenuBar(menuBar);
 
-        // Panel principal con BorderLayout
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBackground(new Color(240, 242, 245));
+        mainPanel.setBackground(COLOR_FONDO);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Panel superior con botones
         JPanel topPanel = crearPanelSuperior();
 
-        // Panel central con tabbedPane
         tabbedPanelHorarios = new JTabbedPane(JTabbedPane.TOP);
         tabbedPanelHorarios.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        tabbedPanelHorarios.setBackground(new Color(255, 255, 255));
+        tabbedPanelHorarios.setBackground(Color.WHITE);
 
-        // Panel inferior con estado
         JPanel bottomPanel = crearPanelInferior();
 
-        // Armar el layout
         mainPanel.add(topPanel, BorderLayout.NORTH);
         mainPanel.add(tabbedPanelHorarios, BorderLayout.CENTER);
         mainPanel.add(bottomPanel, BorderLayout.SOUTH);
@@ -210,21 +191,20 @@ public class InterfazGrafica extends JFrame {
 
     private JMenuBar crearMenuBar() {
         JMenuBar menuBar = new JMenuBar();
-        menuBar.setBackground(new Color(60, 90, 154));
+        menuBar.setBackground(new Color(46, 78, 126));
         menuBar.setForeground(Color.WHITE);
 
-        // Menú Archivo
         JMenu menuArchivo = new JMenu("Archivo");
         menuArchivo.setForeground(Color.WHITE);
 
-        JMenuItem itemNuevo = new JMenuItem("Nuevo Proyecto");
+        JMenuItem itemNuevo = new JMenuItem("Nuevo proyecto");
         JMenuItem itemAbrir = new JMenuItem("Abrir");
         JMenuItem itemGuardar = new JMenuItem("Guardar");
         JMenuItem itemExportar = new JMenuItem("Exportar");
         JMenuItem itemSalir = new JMenuItem("Salir");
 
-        itemSalir.addActionListener(e -> System.exit(0));
         itemExportar.addActionListener(e -> onExportar());
+        itemSalir.addActionListener(e -> System.exit(0));
 
         menuArchivo.add(itemNuevo);
         menuArchivo.add(itemAbrir);
@@ -234,20 +214,17 @@ public class InterfazGrafica extends JFrame {
         menuArchivo.addSeparator();
         menuArchivo.add(itemSalir);
 
-        // Menú Editar
-        JMenu menuEditar = new JMenu("Editar");
+        JMenu menuEditar = new JMenu("Edicion");
         menuEditar.setForeground(Color.WHITE);
         menuEditar.add(new JMenuItem("Deshacer"));
         menuEditar.add(new JMenuItem("Rehacer"));
 
-        // Menú Herramientas
         JMenu menuHerramientas = new JMenu("Herramientas");
         menuHerramientas.setForeground(Color.WHITE);
-        JMenuItem itemValidar = new JMenuItem("Validar Horario");
+        JMenuItem itemValidar = new JMenuItem("Validar horario");
         itemValidar.addActionListener(e -> JOptionPane.showMessageDialog(this, "Validando horario..."));
         menuHerramientas.add(itemValidar);
 
-        // Menú Ayuda
         JMenu menuAyuda = new JMenu("Ayuda");
         menuAyuda.setForeground(Color.WHITE);
         menuAyuda.add(new JMenuItem("Acerca de"));
@@ -262,22 +239,20 @@ public class InterfazGrafica extends JFrame {
     }
 
     private JPanel crearPanelSuperior() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BorderLayout(10, 10));
-        panel.setBackground(new Color(240, 242, 245));
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(COLOR_FONDO);
         panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        // Panel izquierdo con botones principales
         JPanel botonesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        botonesPanel.setBackground(new Color(240, 242, 245));
+        botonesPanel.setBackground(COLOR_FONDO);
 
-        btnConfiguracion = crearBoton("Agregar Profesor", new Color(100, 150, 200));
-        btnNuevoGrupo = crearBoton("+ Nuevo Grupo", new Color(76, 175, 80));
-        btnCrearHorario = crearBoton(" Generar Horario", new Color(255, 152, 0));
-        btnExportar = crearBoton(" Exportar", new Color(156, 39, 176));
-        btnImportar = crearBoton(" Importar", new Color(33, 150, 243));
+        btnConfiguracion = crearBoton("Catalogo de recursos", COLOR_ACCION_PRINCIPAL);
+        btnNuevoGrupo = crearBoton("Agregar grupo", COLOR_ACCION_SECUNDARIA);
+        btnCrearHorario = crearBoton("Planificar semana", COLOR_ACCION_ALERTA);
+        btnExportar = crearBoton("Compartir horario", COLOR_ACCION_DORADO);
+        btnImportar = crearBoton("Importar plantilla", COLOR_ACCION_VIOLETA);
 
-        btnConfiguracion.addActionListener(e -> onConfiguracion());
+        btnConfiguracion.addActionListener(e -> abrirCatalogoRecursos());
         btnNuevoGrupo.addActionListener(e -> onNuevoGrupo());
         btnCrearHorario.addActionListener(e -> onCrearHorario());
         btnExportar.addActionListener(e -> onExportar());
@@ -291,8 +266,7 @@ public class InterfazGrafica extends JFrame {
 
         panel.add(botonesPanel, BorderLayout.WEST);
 
-        // Información del lado derecho
-        JLabel lblTitulo = new JLabel("Gestor de Horarios - K-Coloración de Grafos");
+        JLabel lblTitulo = new JLabel("Planificador academico basado en k-coloracion");
         lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 14));
         lblTitulo.setHorizontalAlignment(SwingConstants.RIGHT);
         panel.add(lblTitulo, BorderLayout.EAST);
@@ -307,12 +281,10 @@ public class InterfazGrafica extends JFrame {
                 BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(200, 200, 200)),
                 BorderFactory.createEmptyBorder(8, 10, 8, 10)));
 
-        lblEstado = new JLabel("Estado: Listo");
+        lblEstado = new JLabel("Estado: listo");
         lblEstado.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         lblEstado.setForeground(new Color(60, 90, 154));
-
         panel.add(lblEstado, BorderLayout.WEST);
-
         return panel;
     }
 
@@ -324,19 +296,12 @@ public class InterfazGrafica extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 if (getModel().isArmed()) {
-                    g2.setColor(new Color(
-                            Math.max(0, color.getRed() - 30),
-                            Math.max(0, color.getGreen() - 30),
-                            Math.max(0, color.getBlue() - 30)));
+                    g2.setColor(color.darker());
                 } else if (getModel().isRollover()) {
-                    g2.setColor(new Color(
-                            Math.min(255, color.getRed() + 20),
-                            Math.min(255, color.getGreen() + 20),
-                            Math.min(255, color.getBlue() + 20)));
+                    g2.setColor(color.brighter());
                 } else {
                     g2.setColor(color);
                 }
-
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
                 super.paintComponent(g);
             }
@@ -347,11 +312,8 @@ public class InterfazGrafica extends JFrame {
         boton.setFocusPainted(false);
         boton.setBorderPainted(false);
         boton.setContentAreaFilled(false);
-        boton.setPreferredSize(new Dimension(150, 35));
+        boton.setPreferredSize(new Dimension(170, 35));
         boton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
         return boton;
     }
-
-  
 }

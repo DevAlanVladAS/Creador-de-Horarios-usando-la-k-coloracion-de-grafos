@@ -15,5 +15,8 @@ public class Salon {
     public String getNombre() { return nombre; }
     public int getCapacidad() { return capacidad; }
     
-  
+    @Override
+    public String toString() {
+        return nombre;
+    }
 }

@@ -32,5 +32,8 @@ public class GrupoEstudiantes {
         return new ArrayList<>(profesorIds);
     }
     
-   
+    @Override
+    public String toString() {
+        return nombre;
+    }
 }

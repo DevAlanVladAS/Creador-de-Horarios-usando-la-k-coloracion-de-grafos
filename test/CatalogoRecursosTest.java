@@ -1,7 +1,9 @@
 package test;
 
+import src.AsignacionAcademica;
 import src.CatalogoRecursos;
 import src.GrupoEstudiantes;
+import src.Materia;
 import src.Profesor;
 import src.Salon;
 
@@ -135,4 +137,38 @@ public class CatalogoRecursosTest {
         Optional<Profesor> profEncontrado = catalogo.findProfesorByName("Inexistente");
         assertFalse(profEncontrado.isPresent());
     }
+
+    @Test
+    public void testMateriasPrecargadas() {
+        List<Materia> materias = catalogo.getTodasLasMaterias();
+        assertFalse("Debe haber materias precargadas", materias.isEmpty());
+        assertTrue(materias.stream().anyMatch(m -> m.getNombre().equalsIgnoreCase("Matemáticas")));
+    }
+
+    @Test
+    public void testAsignacionGeneraBloques() {
+        Profesor profesor = new Profesor("Profesor Test", "Matemáticas");
+        catalogo.addProfesor(profesor);
+        GrupoEstudiantes grupo = new GrupoEstudiantes("1A");
+        catalogo.addGrupo(grupo);
+        Salon salon = new Salon("Aula 1", 30);
+        catalogo.addSalon(salon);
+        Materia materia = catalogo.findMateriaByName("Matemáticas").orElseGet(() -> {
+            Materia nueva = new Materia("Matemáticas", 5);
+            catalogo.addMateria(nueva);
+            return nueva;
+        });
+
+        AsignacionAcademica asignacion = new AsignacionAcademica(
+                grupo.getId(),
+                profesor.getId(),
+                materia.getId(),
+                salon.getId(),
+                3
+        );
+        catalogo.addAsignacionAcademica(asignacion);
+
+        assertEquals(3, catalogo.getBloquesByGrupoId(grupo.getId()).size());
+    }
 }
+

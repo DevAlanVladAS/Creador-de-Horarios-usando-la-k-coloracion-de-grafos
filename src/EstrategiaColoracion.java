@@ -33,7 +33,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         System.out.println("Se necesitaron " + numColoresUsados + " colores (días)");
         
         // Crear días de la semana
-        List<String> dias = Arrays.asList("Lunes", "Martes", "Miercoles", "Jueves", "Viernes");
+        List<String> dias = Arrays.asList("Lunes", "Martes", "Mi\u00e9rcoles", "Jueves", "Viernes");
         
         if (numColoresUsados > dias.size()) {
             System.out.println("ADVERTENCIA: Se necesitan más días de los disponibles");
