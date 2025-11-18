@@ -11,7 +11,9 @@ import java.util.Optional;
  *
  * Esta clase funciona como "Composite" dentro del patrón Composite.
  */
-public class HorarioSemana implements HorarioComponente {
+public class HorarioSemana implements HorarioComponente, java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private List<HorarioDia> diasSemana;                     // Días (Lunes, Martes, ...)
     private List<BloqueHorario> bloquesSinAsignar;           // Bloques aún no colocados

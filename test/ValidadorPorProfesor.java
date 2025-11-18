@@ -1,4 +1,4 @@
-package src;
+package test;
 
 public class ValidadorPorProfesor implements Validador {
     private String tipoConflicto;

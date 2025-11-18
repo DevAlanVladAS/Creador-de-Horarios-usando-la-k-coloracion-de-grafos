@@ -8,7 +8,9 @@ import java.util.List;
  *
  * Este componente funciona dentro del patrón Composite.
  */
-public class HorarioDia implements HorarioComponente {
+public class HorarioDia implements HorarioComponente, java.io.Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String dia;
     private List<BloqueHorario> bloquesHorario;
