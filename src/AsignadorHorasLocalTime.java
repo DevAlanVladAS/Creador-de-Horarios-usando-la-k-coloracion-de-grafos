@@ -1,6 +1,7 @@
 package src;
 import java.time.*;
 import java.util.*;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Fase 3: Asignación de horas dentro de un día usando LocalTime.
@@ -11,14 +12,17 @@ import java.util.*;
  */
 public class AsignadorHorasLocalTime {
 
+    private final CatalogoRecursos catalogo;
     private final LocalTime horaInicioDia;
     private final LocalTime horaFinDia;
     private final List<Validador> validadoresHora;
 
-    public AsignadorHorasLocalTime(LocalTime horaInicioDia,
+    public AsignadorHorasLocalTime(CatalogoRecursos catalogo,
+                                   LocalTime horaInicioDia,
                                    LocalTime horaFinDia,
                                    List<Validador> validadoresHora) {
 
+        this.catalogo = catalogo;
         this.horaInicioDia = horaInicioDia;
         this.horaFinDia = horaFinDia;
 
@@ -45,7 +49,7 @@ public class AsignadorHorasLocalTime {
 
         for (BloqueHorario bloque : bloques) {
 
-            boolean pudo = intentarColocarBloque(dia, bloque, asignados);
+            boolean pudo = intentarColocarBloque(dia, bloque, asignados, bloques);
 
             // Si no se pudo, dejamos su hora intacta y sigue sin posicionar
             if (!pudo) {
@@ -54,13 +58,14 @@ public class AsignadorHorasLocalTime {
         }
 
         // Actualiza el día con el orden final
-        dia.getBloques().clear();
+        dia.getBloques().clear(); // Limpiar la lista original
         dia.getBloques().addAll(asignados);
     }
 
     private boolean intentarColocarBloque(HorarioDia dia,
                                           BloqueHorario bloque,
-                                          List<BloqueHorario> asignados) {
+                                          List<BloqueHorario> asignados,
+                                          List<BloqueHorario> todosLosBloquesDelDia) {
 
         Duration dur = bloque.getDuracion();
 
@@ -77,6 +82,12 @@ public class AsignadorHorasLocalTime {
                 continue;
             }
 
+            // 2. Checar disponibilidad de recursos (profesor, etc.)
+            if (!esHorarioValidoParaRecursos(bloque, dia.getDia(), inicio)) {
+                tiempo = tiempo.plusMinutes(30);
+                continue;
+            }
+
             // 2. Modificamos temporalmente
             LocalTime inicioOriginal = bloque.getHoraInicio();
             LocalTime finOriginal = bloque.getHoraFin();
@@ -85,8 +96,11 @@ public class AsignadorHorasLocalTime {
 
             // 3. Validadores
             boolean valido = true;
-            for (BloqueHorario other : asignados) {
-                for (Validador v : validadoresHora) {
+            // Validar contra todos los bloques del día, no solo los ya asignados en esta iteración.
+            for (BloqueHorario other : todosLosBloquesDelDia) {
+                // Usamos una copia de los validadores para no modificar la original
+                List<Validador> validadoresParaChequeo = new ArrayList<>(validadoresHora);
+                for (Validador v : validadoresParaChequeo) {
                     if (!v.esValido(bloque, other)) {
                         valido = false;
                         break;
@@ -125,5 +139,30 @@ public class AsignadorHorasLocalTime {
         }
 
         return false;
+    }
+
+    private boolean esHorarioValidoParaRecursos(BloqueHorario bloque, String dia, LocalTime hora) {
+        // Validar Profesor
+        String profesorId = bloque.getProfesorId();
+        if (profesorId != null) {
+            Profesor profesor = catalogo.obtenerProfesorPorId(profesorId);
+            if (profesor != null) {
+                // Validar día
+                List<String> diasDisponibles = profesor.getDiasDisponibles();
+                if (diasDisponibles != null && !diasDisponibles.isEmpty() && !diasDisponibles.stream().anyMatch(d -> d.equalsIgnoreCase(dia))) {
+                    return false;
+                }
+                // Validar hora
+                List<String> horasDisponibles = profesor.getHorasDisponibles();
+                String horaFormateada = hora.format(DateTimeFormatter.ofPattern("H:mm"));
+                if (horasDisponibles != null && !horasDisponibles.isEmpty() && !horasDisponibles.contains(horaFormateada)) {
+                    return false;
+                }
+            }
+        }
+
+        // Aquí se podrían agregar validaciones para salones, etc.
+
+        return true;
     }
 }

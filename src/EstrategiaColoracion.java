@@ -22,10 +22,10 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         horarioGrafica.construirGraficaAutomaticamente();
         System.out.println("Gráfica construida con " + horarioGrafica.obtenerNumeroNodos() + 
                            " nodos y " + horarioGrafica.obtenerNumeroAristas() + " aristas");
-        
-        // FASE 2: Colorear grafo (asignar días)
-        System.out.println("\n=== FASE 2: Coloración (asignación de días) ===");
-        Map<String, Integer> colores = horarioGrafica.colorear();
+
+        // FASE 2: Colorear grafo con DSatur (asignar días)
+        System.out.println("\n=== FASE 2: Coloración con DSatur (asignación de días) ===");
+        Map<String, Integer> colores = horarioGrafica.colorearConDSatur();
         
         // Determinar cuántos colores (días) se necesitaron
         int maxColor = colores.values().stream().max(Integer::compare).orElse(-1);
@@ -49,29 +49,12 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         for (Map.Entry<String, Integer> entry : colores.entrySet()) {
             String bloqueId = entry.getKey();
             int color = entry.getValue();
-            
             BloqueHorario bloque = horarioGrafica.obtenerBloque(bloqueId);
             
             if (color < dias.size()) {
                 String dia = dias.get(color);
-                
-                // Verificar disponibilidad del profesor
-                if (esProfesorDisponible(bloque, dia, horarioGrafica.getCatalogo())) {
-                    bloque.setDia(dia);
-                    horarioSemana.agregarBloqueEnDia(dia, bloque);
-                    System.out.println("  " + bloque.getMateria() + " -> " + dia);
-                } else {
-                    // Intentar con otro día disponible
-                    String diaAlternativo = encontrarDiaDisponible(bloque, dias, horarioGrafica.getCatalogo());
-                    if (diaAlternativo != null) {
-                        bloque.setDia(diaAlternativo);
-                        horarioSemana.agregarBloqueEnDia(diaAlternativo, bloque);
-                        System.out.println("  " + bloque.getMateria() + " -> " + diaAlternativo + " (alternativo)");
-                    } else {
-                        horarioSemana.agregarBloqueSinAsignar(bloque);
-                        System.out.println("  " + bloque.getMateria() + " -> SIN ASIGNAR (profesor no disponible)");
-                    }
-                }
+                bloque.setDia(dia);
+                horarioSemana.agregarBloqueEnDia(dia, bloque);
             } else {
                 horarioSemana.agregarBloqueSinAsignar(bloque);
             }
@@ -86,7 +69,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         );
         
         AsignadorHorasLocalTime asignadorHoras = new AsignadorHorasLocalTime(
-            LocalTime.of(7, 0),
+            horarioGrafica.getCatalogo(), LocalTime.of(7, 0),
             LocalTime.of(20, 0),
             validadores
         );

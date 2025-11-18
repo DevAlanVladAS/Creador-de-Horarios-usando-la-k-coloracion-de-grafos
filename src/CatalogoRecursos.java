@@ -111,6 +111,12 @@ public class CatalogoRecursos {
         return new ArrayList<>(grupos.values());
     }
 
+    public List<GrupoEstudiantes> getGruposPorGrado(int grado) {
+        return grupos.values().stream()
+                .filter(g -> g.getGrado() == grado)
+                .collect(Collectors.toList());
+    }
+
     // --- MATERIAS ---
     public void addMateria(Materia materia) {
         materias.put(materia.getId(), materia);
@@ -182,6 +188,13 @@ public class CatalogoRecursos {
             .collect(Collectors.toList());
     }
 
+    public List<BloqueHorario> getBloquesByGrupoIds(List<String> grupoIds) {
+        if (grupoIds == null || grupoIds.isEmpty()) return new ArrayList<>();
+        return bloques.values().stream()
+                .filter(b -> b.getGrupoId() != null && grupoIds.contains(b.getGrupoId()))
+                .collect(Collectors.toList());
+    }
+
     public List<BloqueHorario> getBloquesByProfesorId(String profesorId) {
         return bloques.values().stream()
             .filter(b -> profesorId != null && profesorId.equals(b.getProfesorId()))
@@ -236,12 +249,28 @@ public class CatalogoRecursos {
         ids.forEach(this::removeAsignacion);
     }
 
-    private void reconstruirBloquesDeAsignacion(AsignacionAcademica asignacion) {
+    public void reconstruirBloquesDeAsignacion(AsignacionAcademica asignacion) {
+        // Primero, eliminar los bloques viejos asociados a esta asignación para evitar duplicados.
+        removeBloquesPorAsignacion(asignacion.getId());
+
+        // Ahora, crear los nuevos bloques desde cero.
         Materia materia = materias.get(asignacion.getMateriaId());
+        Profesor profesor = profesores.get(asignacion.getProfesorId());
         if (materia == null) {
             throw new IllegalStateException("Materia no encontrada para la asignación");
         }
-        List<BloqueHorario> nuevosBloques = asignacion.construirBloques(materia.getNombre());
+        
+        // Pasar horas disponibles del profesor si existen
+        List<BloqueHorario> nuevosBloques;
+        if (profesor != null && profesor.getHorasDisponibles() != null && !profesor.getHorasDisponibles().isEmpty()) {
+            nuevosBloques = asignacion.construirBloquesRespetandoDisponibilidad(
+                    materia.getNombre(), 
+                    profesor.getHorasDisponibles()
+            );
+        } else {
+            nuevosBloques = asignacion.construirBloques(materia.getNombre());
+        }
+        
         nuevosBloques.forEach(this::addBloqueHorario);
         asignacion.registrarBloques(nuevosBloques);
         asignacionABloques.put(asignacion.getId(), asignacion.getBloqueIds());

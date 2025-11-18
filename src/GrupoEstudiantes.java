@@ -6,17 +6,21 @@ import java.util.List;
 public class GrupoEstudiantes {
     private final String id;
     private String nombre; // e.g., "3A" o "Primero B"
+    private int grado; // e.g., 1, 2, 3
     // Lista de IDs de profesores asignados a este grupo
     private final List<String> profesorIds = new ArrayList<>();
 
-    public GrupoEstudiantes(String nombre) {
+    public GrupoEstudiantes(String nombre, int grado) {
         this.id = UUID.randomUUID().toString();
         this.nombre = nombre;
+        this.grado = grado;
     }
     
     public String getId() { return id; }
     public String getNombre() { return nombre; }
-    
+    public int getGrado() { return grado; }
+    public void setGrado(int grado) { this.grado = grado; }
+
     public void addProfesor(String profesorId) {
         if (profesorId == null) return;
         if (!profesorIds.contains(profesorId)) {
@@ -34,6 +38,6 @@ public class GrupoEstudiantes {
     
     @Override
     public String toString() {
-        return nombre;
+        return grado + "°" + nombre;
     }
 }

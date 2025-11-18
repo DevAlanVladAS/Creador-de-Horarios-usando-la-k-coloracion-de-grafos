@@ -79,6 +79,11 @@ public class HorarioDia implements HorarioComponente {
  
     private void validarNoTraslape(BloqueHorario nuevo) {
         for (BloqueHorario existente : bloquesHorario) {
+            // Si alguno de los bloques no tiene hora de inicio, no podemos validar traslape.
+            // Esto es importante durante la generación automática, antes de la Fase 3.
+            if (nuevo.getHoraInicio() == null || existente.getHoraInicio() == null) {
+                continue;
+            }
 
             if (existente == nuevo) continue;
 
