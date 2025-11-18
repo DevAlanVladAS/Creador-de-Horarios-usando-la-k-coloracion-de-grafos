@@ -3,6 +3,10 @@ package src;
 import java.awt.*;
 import javax.swing.*;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.Comparator;
+import java.util.HashMap;
 
 /**
  * Ventana principal para la gestion visual de horarios.
@@ -21,7 +25,9 @@ public class InterfazGrafica extends JFrame {
     private JButton btnCrearHorario;
     private JButton btnConfiguracion;
     private JButton btnExportar;
+    private JComboBox<Integer> cmbGradoSelector;
     private JButton btnImportar;
+    private JButton btnReiniciar;
 
     private static final Color COLOR_FONDO = new Color(245, 248, 255);
     private static final Color COLOR_ACCION_PRINCIPAL = new Color(76, 110, 245);
@@ -33,6 +39,10 @@ public class InterfazGrafica extends JFrame {
     private JLabel lblEstado;
 
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
+    
+    // Cache de paneles para evitar recrearlos constantemente
+    private final Map<String, PanelHorario> cachePanelesGrupo = new HashMap<>();
+    private final Map<Integer, PanelHorarioGrado> cachePanelesGrado = new HashMap<>();
 
     public InterfazGrafica() {
         setTitle("Creador de Horarios - K-Coloracion de Grafos");
@@ -55,18 +65,132 @@ public class InterfazGrafica extends JFrame {
         }
     }
 
+    /**
+     * CORREGIDO: Ahora guarda el estado de los bloques antes de cambiar de vista
+     */
     private void cargarPestanasDeGrupos() {
+        Integer gradoSeleccionado = (Integer) cmbGradoSelector.getSelectedItem();
+        
+        // NUEVO: Guardar estado actual de todos los paneles visibles
+        guardarEstadoPanelesActuales();
+        
         tabbedPanelHorarios.removeAll();
-        for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
-            agregarPestanaHorario(grupo);
+
+        if (gradoSeleccionado == null) {
+            mostrarPlaceholderCrearHorario();
+            return;
+        }
+
+        List<GrupoEstudiantes> gruposDelGrado = catalogo.getGruposPorGrado(gradoSeleccionado).stream()
+                .sorted(Comparator.comparing(GrupoEstudiantes::getNombre))
+                .collect(Collectors.toList());
+
+        if (gruposDelGrado.isEmpty()) {
+            return;
+        }
+
+        // 1. Añadir la vista general del grado (reutilizando desde cache si existe)
+        agregarPestanaGrado("Vista General " + gradoSeleccionado + "° Grado", gruposDelGrado, gradoSeleccionado);
+        
+        // 2. Añadir pestañas para cada grupo individual (reutilizando desde cache)
+        gruposDelGrado.forEach(this::agregarPestanaHorario);
+    }
+
+    /**
+     * NUEVO: Guarda el estado de los bloques desde los paneles actuales al catálogo
+     */
+    private void guardarEstadoPanelesActuales() {
+        for (int i = 0; i < tabbedPanelHorarios.getTabCount(); i++) {
+            Component comp = tabbedPanelHorarios.getComponentAt(i);
+            
+            // Guardar estado de paneles individuales
+            if (comp instanceof PanelHorario) {
+                guardarEstadoPanel((PanelHorario) comp);
+            }
+            
+            // Guardar estado de paneles de grado (están en un JScrollPane)
+            if (comp instanceof JScrollPane) {
+                JScrollPane scroll = (JScrollPane) comp;
+                Component view = scroll.getViewport().getView();
+                if (view instanceof PanelHorarioGrado) {
+                    guardarEstadoPanelGrado((PanelHorarioGrado) view);
+                }
+            }
         }
     }
 
+    /**
+     * NUEVO: Extrae y persiste el estado de un PanelHorario individual
+     */
+    private void guardarEstadoPanel(PanelHorario panel) {
+        List<BloquePanel> bloques = panel.getAllBloquePanels();
+        for (BloquePanel bloquePanel : bloques) {
+            BloqueHorario bloque = bloquePanel.getBloque();
+            // El estado ya está en el objeto bloque, solo nos aseguramos que esté en el catálogo
+            BloqueHorario bloqueEnCatalogo = catalogo.getBloqueHorarioById(bloque.getId());
+            if (bloqueEnCatalogo != null) {
+                // Sincronizar el estado (dia, hora) del panel al catálogo
+                bloqueEnCatalogo.setDia(bloque.getDia());
+                bloqueEnCatalogo.setHoraInicio(bloque.getHoraInicio());
+                bloqueEnCatalogo.setHoraFin(bloque.getHoraFin());
+            }
+        }
+    }
+
+    /**
+     * NUEVO: Extrae y persiste el estado de un PanelHorarioGrado
+     */
+    private void guardarEstadoPanelGrado(PanelHorarioGrado panel) {
+        // El PanelHorarioGrado también maneja bloques, extraemos su estado
+        List<BloqueHorario> bloques = panel.obtenerTodosLosBloques();
+        for (BloqueHorario bloque : bloques) {
+            BloqueHorario bloqueEnCatalogo = catalogo.getBloqueHorarioById(bloque.getId());
+            if (bloqueEnCatalogo != null) {
+                bloqueEnCatalogo.setDia(bloque.getDia());
+                bloqueEnCatalogo.setHoraInicio(bloque.getHoraInicio());
+                bloqueEnCatalogo.setHoraFin(bloque.getHoraFin());
+            }
+        }
+    }
+
+    /**
+     * CORREGIDO: Reutiliza paneles en lugar de recrearlos
+     */
     private void agregarPestanaHorario(GrupoEstudiantes grupo) {
-        PanelHorario panel = new PanelHorario();
+        PanelHorario panel = cachePanelesGrupo.get(grupo.getId());
+        
+        if (panel == null) {
+            // Crear nuevo panel si no existe en cache
+            panel = new PanelHorario();
+            cachePanelesGrupo.put(grupo.getId(), panel);
+        }
+        
+        // Recargar bloques desde el catálogo (que ya tiene el estado actualizado)
         List<BloqueHorario> bloquesDelGrupo = catalogo.getBloquesByGrupoId(grupo.getId());
         panel.cargarBloques(bloquesDelGrupo);
+        
         tabbedPanelHorarios.addTab(grupo.getNombre(), panel);
+    }
+
+    /**
+     * CORREGIDO: Reutiliza panel de grado y permite edición
+     */
+    private void agregarPestanaGrado(String titulo, List<GrupoEstudiantes> grupos, Integer grado) {
+        PanelHorarioGrado panelGrado = cachePanelesGrado.get(grado);
+        
+        List<String> idsGrupos = grupos.stream().map(GrupoEstudiantes::getId).collect(Collectors.toList());
+        List<BloqueHorario> bloquesDelGrado = catalogo.getBloquesByGrupoIds(idsGrupos);
+        
+        if (panelGrado == null) {
+            // Crear nuevo panel si no existe
+            panelGrado = new PanelHorarioGrado(grupos, bloquesDelGrado);
+            cachePanelesGrado.put(grado, panelGrado);
+        } else {
+            // Actualizar bloques en el panel existente
+            panelGrado.cargarBloques(bloquesDelGrado);
+        }
+        
+        tabbedPanelHorarios.addTab(titulo, new JScrollPane(panelGrado));
     }
 
     private void abrirCatalogoRecursos() {
@@ -78,30 +202,107 @@ public class InterfazGrafica extends JFrame {
                 "Ingrese el nombre del nuevo grupo (e.g., 1B, 3A):",
                 "Nuevo Grupo", JOptionPane.PLAIN_MESSAGE);
 
-        if (nombreGrupo != null && !nombreGrupo.trim().isEmpty()) {
-            GrupoEstudiantes nuevoGrupo = new GrupoEstudiantes(nombreGrupo.trim());
+        if (nombreGrupo != null && !nombreGrupo.trim().isEmpty()) {            
+            if (catalogo.findGrupoByName(nombreGrupo.trim()).isPresent()) {
+                JOptionPane.showMessageDialog(this, "El grupo '" + nombreGrupo.trim() + "' ya existe.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            GrupoEstudiantes nuevoGrupo = new GrupoEstudiantes(nombreGrupo.trim(), 1);
             catalogo.addGrupo(nuevoGrupo);
-            cargarPestanasDeGrupos();
+
+            if (tabbedPanelHorarios.getTabCount() == 1 && tabbedPanelHorarios.getTitleAt(0).equals("Inicio")) {
+                tabbedPanelHorarios.removeAll();
+            }
+
+            refrescarDatosYBloquesExistentes();
             tabbedPanelHorarios.setSelectedIndex(tabbedPanelHorarios.getTabCount() - 1);
         }
     }
 
     private void onCrearHorario() {
-        if (tabbedPanelHorarios.getTabCount() == 0) {
+        if (catalogo.getTodosLosBloques().isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "No hay grupos creados para generar un horario.",
+                    "No hay asignaciones académicas creadas. Vaya a 'Catálogo de recursos' para crearlas.",
                     "Advertencia", JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        String grupoSeleccionado = tabbedPanelHorarios.getTitleAt(
-                tabbedPanelHorarios.getSelectedIndex());
+        int tabSeleccionado = tabbedPanelHorarios.getSelectedIndex();
+        if (tabSeleccionado == -1) {
+             JOptionPane.showMessageDialog(this, "Seleccione una pestaña de grado para continuar.", "Acción no disponible", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        Integer grado = (Integer) cmbGradoSelector.getSelectedItem();
+        if (grado == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione un grado del menú superior.", "Acción no disponible", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // CORREGIDO: Guardar estado antes de generar
+        guardarEstadoPanelesActuales();
+        
+        String tituloAnimacion = "Generando para " + grado + "° Grado...";
+        PanelHorario panelAnimacion = new PanelHorario();
+        panelAnimacion.setDropTarget(null);
 
-        JOptionPane.showMessageDialog(this,
-                "Ejecutando k-coloracion para el grupo: " + grupoSeleccionado + "...",
-                "Generando horario", JOptionPane.INFORMATION_MESSAGE);
+        tabbedPanelHorarios.addTab(tituloAnimacion, panelAnimacion);
+        tabbedPanelHorarios.setSelectedComponent(panelAnimacion);
 
-        lblEstado.setText("Estado: horario generado para " + grupoSeleccionado);
+        lblEstado.setText("Estado: Generando horario para " + grado + "° Grado...");
+
+        SwingWorker<HorarioSemana, Void> worker = new SwingWorker<>() {
+            @Override
+            protected HorarioSemana doInBackground() throws Exception {
+                List<GrupoEstudiantes> gruposDelGrado = catalogo.getGruposPorGrado(grado);
+                List<String> idsGrupos = gruposDelGrado.stream().map(GrupoEstudiantes::getId).collect(Collectors.toList());
+                List<BloqueHorario> bloquesDelGrado = catalogo.getBloquesByGrupoIds(idsGrupos);
+
+                AdaptadorGraficaDeHorarios adaptador = new AdaptadorGraficaDeHorarios(bloquesDelGrado, catalogo);
+                EstrategiaGeneracion estrategia = new EstrategiaColoracion();
+                return estrategia.generarHorario(adaptador);
+            }
+
+            @Override
+            protected void done() {
+                HorarioSemana horarioGenerado = null;
+                try {
+                    horarioGenerado = get();
+                    lblEstado.setText("Estado: Generación completada. Iniciando animación...");
+
+                    panelAnimacion.cargarBloques(horarioGenerado.getBloques());
+
+                    AnimadorHorario animador = new AnimadorHorario(panelAnimacion, horarioGenerado.getBloques(), lblEstado, () -> {
+                        SwingUtilities.invokeLater(() -> {
+                            tabbedPanelHorarios.remove(panelAnimacion);
+                            // CORREGIDO: Invalidar cache del grado para forzar actualización
+                            cachePanelesGrado.remove(grado);
+                            // Invalidar cache de grupos de ese grado
+                            List<GrupoEstudiantes> gruposDelGrado = catalogo.getGruposPorGrado(grado);
+                            gruposDelGrado.forEach(g -> cachePanelesGrupo.remove(g.getId()));
+                        });
+                        refrescarDatosYBloquesExistentes();
+                        for (int i = 0; i < tabbedPanelHorarios.getTabCount(); i++) {
+                            if (tabbedPanelHorarios.getTitleAt(i).startsWith(String.valueOf(grado))) {
+                                tabbedPanelHorarios.setSelectedIndex(i);
+                                break;
+                            }
+                        }
+                    });
+                    animador.iniciar();
+
+                } catch (Exception e) {
+                    lblEstado.setText("Estado: Error en la generación del horario.");
+                    if (panelAnimacion.getParent() == tabbedPanelHorarios) {
+                        tabbedPanelHorarios.remove(panelAnimacion);
+                    }
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        worker.execute();
     }
 
     private void onExportar() {
@@ -114,6 +315,26 @@ public class InterfazGrafica extends JFrame {
         JOptionPane.showMessageDialog(this,
                 "Funcionalidad de importacion en desarrollo.",
                 "Importar", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void onReiniciarHorario() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Estás seguro de que deseas reiniciar todos los horarios?\n" +
+                "Todos los bloques volverán a la sección 'sin asignar'.",
+                "Confirmar Reinicio",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            // CORREGIDO: Limpiar caches antes de reiniciar
+            cachePanelesGrupo.clear();
+            cachePanelesGrado.clear();
+            
+            catalogo.getTodosLosGrupos().forEach(grupo -> {
+                catalogo.getAsignacionesPorGrupo(grupo.getId()).forEach(catalogo::reconstruirBloquesDeAsignacion);
+            });
+            refrescarDatosYBloquesExistentes();
+        }
     }
 
     private void mostrarPlaceholderCrearHorario() {
@@ -163,7 +384,57 @@ public class InterfazGrafica extends JFrame {
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+        
+        // CORREGIDO: Limpiar caches después de modificar recursos
+        cachePanelesGrupo.clear();
+        cachePanelesGrado.clear();
+        
+        refrescarDatosYBloquesExistentes();
+    }
+
+    private void refrescarDatosYBloquesExistentes() {
+        // CORREGIDO: Guardar estado antes de refrescar
+        guardarEstadoPanelesActuales();
+        
+        actualizarSelectorDeGrado();
         cargarPestanasDeGrupos();
+    }
+
+    private void actualizarSelectorDeGrado() {
+        Integer gradoSeleccionadoAntes = (Integer) cmbGradoSelector.getSelectedItem();
+        
+        List<Integer> grados = catalogo.getTodosLosGrupos().stream()
+                .map(GrupoEstudiantes::getGrado)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        cmbGradoSelector.setModel(new DefaultComboBoxModel<>(grados.toArray(new Integer[0])));
+
+        if (grados.contains(gradoSeleccionadoAntes)) {
+            cmbGradoSelector.setSelectedItem(gradoSeleccionadoAntes);
+        } else if (!grados.isEmpty()) {
+            cmbGradoSelector.setSelectedIndex(0);
+        } else {
+            cmbGradoSelector.setSelectedItem(null);
+        }
+    }
+
+    private Component crearComponentePestana(String titulo, Color color) {
+        JPanel pnlTab = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        pnlTab.setOpaque(false);
+        JLabel lblTitle = new JLabel(titulo);
+        lblTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+        
+        JPanel colorIndicator = new JPanel();
+        colorIndicator.setPreferredSize(new Dimension(10, 10));
+        colorIndicator.setBackground(color);
+        colorIndicator.setBorder(BorderFactory.createLineBorder(color.darker()));
+
+        pnlTab.add(colorIndicator);
+        pnlTab.add(Box.createHorizontalStrut(5));
+        pnlTab.add(lblTitle);
+        return pnlTab;
     }
 
     private void initComponents() {
@@ -246,17 +517,26 @@ public class InterfazGrafica extends JFrame {
         JPanel botonesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         botonesPanel.setBackground(COLOR_FONDO);
 
+        cmbGradoSelector = new JComboBox<>();
+        cmbGradoSelector.setPreferredSize(new Dimension(120, 30));
+        cmbGradoSelector.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        cmbGradoSelector.addActionListener(e -> cargarPestanasDeGrupos());
+        botonesPanel.add(new JLabel("Ver Grado:"));
+        botonesPanel.add(cmbGradoSelector);
+
         btnConfiguracion = crearBoton("Catalogo de recursos", COLOR_ACCION_PRINCIPAL);
         btnNuevoGrupo = crearBoton("Agregar grupo", COLOR_ACCION_SECUNDARIA);
         btnCrearHorario = crearBoton("Planificar semana", COLOR_ACCION_ALERTA);
         btnExportar = crearBoton("Compartir horario", COLOR_ACCION_DORADO);
         btnImportar = crearBoton("Importar plantilla", COLOR_ACCION_VIOLETA);
+        btnReiniciar = crearBoton("Reiniciar Horario", new Color(220, 53, 69));
 
         btnConfiguracion.addActionListener(e -> abrirCatalogoRecursos());
         btnNuevoGrupo.addActionListener(e -> onNuevoGrupo());
         btnCrearHorario.addActionListener(e -> onCrearHorario());
         btnExportar.addActionListener(e -> onExportar());
         btnImportar.addActionListener(e -> onImportar());
+        btnReiniciar.addActionListener(e -> onReiniciarHorario());
 
         botonesPanel.add(btnConfiguracion);
         botonesPanel.add(btnNuevoGrupo);
@@ -266,10 +546,16 @@ public class InterfazGrafica extends JFrame {
 
         panel.add(botonesPanel, BorderLayout.WEST);
 
+        JPanel eastPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        eastPanel.setBackground(COLOR_FONDO);
+
         JLabel lblTitulo = new JLabel("Planificador academico basado en k-coloracion");
         lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 14));
         lblTitulo.setHorizontalAlignment(SwingConstants.RIGHT);
-        panel.add(lblTitulo, BorderLayout.EAST);
+
+        eastPanel.add(lblTitulo);
+        eastPanel.add(btnReiniciar);
+        panel.add(eastPanel, BorderLayout.EAST);
 
         return panel;
     }

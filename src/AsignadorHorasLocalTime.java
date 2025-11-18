@@ -1,24 +1,30 @@
 package src;
 import java.time.*;
 import java.util.*;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Fase 3: Asignación de horas dentro de un día usando LocalTime.
+ * CORREGIDO: Mejor manejo de disponibilidad y conflictos.
+ * 
  * - Ordena bloques por duración (más largos primero).
- * - Intenta colocarlos empezando desde horaInicioDia en intervalos de 30 min.
+ * - Intenta colocarlos empezando desde horaInicioDia en intervalos de 50 min.
  * - Respeta validadores de conflicto (recurso, profesor, grupo, etc.)
  * - Actualiza horaInicio y horaFin correctamente.
  */
 public class AsignadorHorasLocalTime {
 
+    private final CatalogoRecursos catalogo;
     private final LocalTime horaInicioDia;
     private final LocalTime horaFinDia;
     private final List<Validador> validadoresHora;
 
-    public AsignadorHorasLocalTime(LocalTime horaInicioDia,
+    public AsignadorHorasLocalTime(CatalogoRecursos catalogo,
+                                   LocalTime horaInicioDia,
                                    LocalTime horaFinDia,
                                    List<Validador> validadoresHora) {
 
+        this.catalogo = catalogo;
         this.horaInicioDia = horaInicioDia;
         this.horaFinDia = horaFinDia;
 
@@ -34,79 +40,209 @@ public class AsignadorHorasLocalTime {
     }
 
     private void asignarHorasEnDia(HorarioDia dia) {
-
+        System.out.println("\n  Asignando horas para " + dia.getDia() + "...");
+        
         // Copiamos bloques del día
         List<BloqueHorario> bloques = new ArrayList<>(dia.getBloques());
+        
+        if (bloques.isEmpty()) {
+            System.out.println("    (sin bloques)");
+            return;
+        }
 
-        // Orden por duración descendente
-        bloques.sort((a, b) -> b.getDuracion().compareTo(a.getDuracion()));
+        // MEJORADO: Orden por prioridad
+        // 1. Bloques con restricciones de hora primero
+        // 2. Luego por duración descendente
+        bloques.sort((a, b) -> {
+            boolean aRestringido = tieneRestriccionHoraria(a);
+            boolean bRestringido = tieneRestriccionHoraria(b);
+            
+            if (aRestringido && !bRestringido) return -1;
+            if (!aRestringido && bRestringido) return 1;
+            
+            return b.getDuracion().compareTo(a.getDuracion());
+        });
 
         List<BloqueHorario> asignados = new ArrayList<>();
+        int bloquesExitosos = 0;
 
         for (BloqueHorario bloque : bloques) {
+            boolean pudo = intentarColocarBloque(dia, bloque, asignados, bloques);
 
-            boolean pudo = intentarColocarBloque(dia, bloque, asignados);
-
-            // Si no se pudo, dejamos su hora intacta y sigue sin posicionar
-            if (!pudo) {
-                System.out.println("Advertencia: No se pudo asignar hora al bloque " + bloque.getId());
+            if (pudo) {
+                bloquesExitosos++;
+                System.out.println("    ✓ " + bloque.getMateria() + 
+                                 " (" + bloque.getHoraInicio() + "-" + bloque.getHoraFin() + ")");
+            } else {
+                System.out.println("    ✗ " + bloque.getMateria() + 
+                                 " (no se pudo asignar hora)");
+                // CORREGIDO: Mantener en la lista pero sin hora
+                asignados.add(bloque);
             }
         }
+
+        System.out.println("    Total: " + bloquesExitosos + "/" + bloques.size() + " bloques asignados");
 
         // Actualiza el día con el orden final
         dia.getBloques().clear();
         dia.getBloques().addAll(asignados);
     }
 
+    /**
+     * NUEVO: Verifica si un bloque tiene restricciones horarias del profesor
+     */
+    private boolean tieneRestriccionHoraria(BloqueHorario bloque) {
+        if (bloque.getProfesorId() == null) return false;
+        
+        Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
+        if (profesor == null) return false;
+        
+        List<String> horas = profesor.getHorasDisponibles();
+        return horas != null && !horas.isEmpty();
+    }
+
     private boolean intentarColocarBloque(HorarioDia dia,
                                           BloqueHorario bloque,
-                                          List<BloqueHorario> asignados) {
+                                          List<BloqueHorario> asignados,
+                                          List<BloqueHorario> todosLosBloquesDelDia) {
 
         Duration dur = bloque.getDuracion();
-
         LocalTime tiempo = horaInicioDia;
+        
+        // MEJORADO: Obtener horas disponibles del profesor si existen
+        List<LocalTime> horasPreferidas = obtenerHorasDisponibles(bloque, dia.getDia());
 
-        while (!tiempo.plus(dur).isAfter(horaFinDia)) {
-
-            LocalTime inicio = tiempo;
-            LocalTime fin = tiempo.plus(dur);
-
-            // 1. Checar empalme básico
-            if (hayEmpalmeCon(inicio, fin, asignados)) {
-                tiempo = tiempo.plusMinutes(30);
-                continue;
-            }
-
-            // 2. Modificamos temporalmente
-            LocalTime inicioOriginal = bloque.getHoraInicio();
-            LocalTime finOriginal = bloque.getHoraFin();
-
-            bloque.actualizarIntervalo(inicio, fin);
-
-            // 3. Validadores
-            boolean valido = true;
-            for (BloqueHorario other : asignados) {
-                for (Validador v : validadoresHora) {
-                    if (!v.esValido(bloque, other)) {
-                        valido = false;
-                        break;
-                    }
+        // ESTRATEGIA 1: Intentar en horas preferidas del profesor
+        if (!horasPreferidas.isEmpty()) {
+            for (LocalTime horaPreferida : horasPreferidas) {
+                if (intentarAsignarEnHora(bloque, horaPreferida, dur, dia, asignados, todosLosBloquesDelDia)) {
+                    return true;
                 }
-                if (!valido) break;
             }
+        }
 
-            if (valido) {
-                asignados.add(bloque);
+        // ESTRATEGIA 2: Búsqueda exhaustiva en intervalos de 50 minutos
+        while (!tiempo.plus(dur).isAfter(horaFinDia)) {
+            if (intentarAsignarEnHora(bloque, tiempo, dur, dia, asignados, todosLosBloquesDelDia)) {
                 return true;
             }
-
-            // Revertimos
-            bloque.actualizarIntervalo(inicioOriginal, finOriginal);
-
-            tiempo = tiempo.plusMinutes(30);
+            tiempo = tiempo.plusMinutes(50); // CORREGIDO: Bloques de 50 min
         }
 
         return false;
+    }
+
+    /**
+     * NUEVO: Intenta asignar un bloque en una hora específica
+     */
+    private boolean intentarAsignarEnHora(
+            BloqueHorario bloque,
+            LocalTime inicio,
+            Duration dur,
+            HorarioDia dia,
+            List<BloqueHorario> asignados,
+            List<BloqueHorario> todosLosBloquesDelDia) {
+        
+        LocalTime fin = inicio.plus(dur);
+        
+        // Verificar que no exceda el horario del día
+        if (fin.isAfter(horaFinDia)) {
+            return false;
+        }
+
+        // 1. Checar empalme básico
+        if (hayEmpalmeCon(inicio, fin, asignados)) {
+            return false;
+        }
+
+        // 2. Checar disponibilidad de recursos (profesor, etc.)
+        if (!esHorarioValidoParaRecursos(bloque, dia.getDia(), inicio)) {
+            return false;
+        }
+
+        // 3. Guardar estado original
+        LocalTime inicioOriginal = bloque.getHoraInicio();
+        LocalTime finOriginal = bloque.getHoraFin();
+
+        bloque.actualizarIntervalo(inicio, fin);
+
+        // 4. Validadores
+        boolean valido = true;
+        for (BloqueHorario other : asignados) {
+            if (other == bloque) continue;
+            
+            for (Validador v : validadoresHora) {
+                if (!v.esValido(bloque, other)) {
+                    valido = false;
+                    break;
+                }
+            }
+            if (!valido) break;
+        }
+
+        if (valido) {
+            asignados.add(bloque);
+            return true;
+        }
+
+        // Revertir
+        if (inicioOriginal != null && finOriginal != null) {
+            bloque.actualizarIntervalo(inicioOriginal, finOriginal);
+        } else {
+            bloque.setHoraInicio(null);
+            bloque.setHoraFin(null);
+        }
+
+        return false;
+    }
+
+    /**
+     * NUEVO: Obtiene las horas disponibles del profesor como LocalTime
+     */
+    private List<LocalTime> obtenerHorasDisponibles(BloqueHorario bloque, String dia) {
+        List<LocalTime> horas = new ArrayList<>();
+        
+        if (bloque.getProfesorId() == null) {
+            return horas;
+        }
+        
+        Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
+        if (profesor == null) {
+            return horas;
+        }
+        
+        // Verificar que el profesor esté disponible este día
+        List<String> diasDisp = profesor.getDiasDisponibles();
+        if (diasDisp != null && !diasDisp.isEmpty()) {
+            boolean diaDisponible = diasDisp.stream()
+                    .anyMatch(d -> d.equalsIgnoreCase(dia));
+            if (!diaDisponible) {
+                return horas; // No está disponible este día
+            }
+        }
+        
+        List<String> horasDisp = profesor.getHorasDisponibles();
+        if (horasDisp == null || horasDisp.isEmpty()) {
+            return horas;
+        }
+        
+        // Convertir strings a LocalTime
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("H:mm");
+        for (String horaStr : horasDisp) {
+            try {
+                LocalTime hora = LocalTime.parse(horaStr, formatter);
+                // Solo agregar si está dentro del rango del día
+                if (!hora.isBefore(horaInicioDia) && 
+                    !hora.plus(bloque.getDuracion()).isAfter(horaFinDia)) {
+                    horas.add(hora);
+                }
+            } catch (Exception e) {
+                System.err.println("Error parseando hora: " + horaStr);
+            }
+        }
+        
+        horas.sort(LocalTime::compareTo);
+        return horas;
     }
 
     private boolean hayEmpalmeCon(LocalTime inicio,
@@ -114,6 +250,9 @@ public class AsignadorHorasLocalTime {
                                   List<BloqueHorario> asignados) {
 
         for (BloqueHorario b : asignados) {
+            if (b.getHoraInicio() == null || b.getHoraFin() == null) {
+                continue;
+            }
 
             LocalTime bs = b.getHoraInicio();
             LocalTime bf = b.getHoraFin();
@@ -125,5 +264,37 @@ public class AsignadorHorasLocalTime {
         }
 
         return false;
+    }
+
+    private boolean esHorarioValidoParaRecursos(BloqueHorario bloque, String dia, LocalTime hora) {
+        // Validar Profesor
+        String profesorId = bloque.getProfesorId();
+        if (profesorId != null) {
+            Profesor profesor = catalogo.obtenerProfesorPorId(profesorId);
+            if (profesor != null) {
+                // Validar día
+                List<String> diasDisponibles = profesor.getDiasDisponibles();
+                if (diasDisponibles != null && !diasDisponibles.isEmpty()) {
+                    boolean diaValido = diasDisponibles.stream()
+                            .anyMatch(d -> d.equalsIgnoreCase(dia));
+                    if (!diaValido) {
+                        return false;
+                    }
+                }
+                
+                // Validar hora
+                List<String> horasDisponibles = profesor.getHorasDisponibles();
+                if (horasDisponibles != null && !horasDisponibles.isEmpty()) {
+                    String horaFormateada = hora.format(DateTimeFormatter.ofPattern("H:mm"));
+                    if (!horasDisponibles.contains(horaFormateada)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Aquí se podrían agregar validaciones para salones, etc.
+
+        return true;
     }
 }

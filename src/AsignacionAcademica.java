@@ -83,6 +83,54 @@ public class AsignacionAcademica implements Serializable {
         return construirBloques(materiaNombre, PlantillaHoraria.BLOQUES_ESTANDAR, PlantillaHoraria.DURACION_BLOQUE);
     }
 
+    public List<BloqueHorario> construirBloquesRespetandoDisponibilidad(String materiaNombre, List<String> horasDisponibles) {
+        List<BloqueHorario> bloques = new ArrayList<>();
+        if (materiaNombre == null || materiaNombre.isBlank() || horasDisponibles == null || horasDisponibles.isEmpty()) {
+            return construirBloques(materiaNombre); // Fallback si no hay horas disponibles
+        }
+
+        Duration bloqueDuracion = PlantillaHoraria.DURACION_BLOQUE;
+        int bloquesGenerados = 0;
+
+        // Convertir horasDisponibles (strings como "7:00", "8:00") a LocalTime
+        List<LocalTime> horasDispoLocales = new ArrayList<>();
+        for (String hora : horasDisponibles) {
+            try {
+                String[] partes = hora.split(":");
+                int h = Integer.parseInt(partes[0]);
+                horasDispoLocales.add(LocalTime.of(h, 0));
+            } catch (Exception e) {
+                // Ignorar horas mal formateadas
+            }
+        }
+
+        if (horasDispoLocales.isEmpty()) {
+            return construirBloques(materiaNombre); // Fallback
+        }
+
+        // Generar bloques solo en horas disponibles
+        for (int i = 0; i < horasSemanales && bloquesGenerados < horasSemanales; i++) {
+            LocalTime slot = horasDispoLocales.get(i % horasDispoLocales.size());
+            int repeticion = i / horasDispoLocales.size();
+            LocalTime inicio = slot.plusMinutes(repeticion * 5L);
+            LocalTime fin = inicio.plus(bloqueDuracion);
+
+            BloqueHorario bloque = new BloqueHorario(
+                    inicio,
+                    fin,
+                    materiaNombre,
+                    profesorId,
+                    salonId,
+                    grupoId,
+                    true
+            );
+            bloques.add(bloque);
+            bloquesGenerados++;
+        }
+
+        return bloques;
+    }
+
     public List<BloqueHorario> construirBloques(String materiaNombre,
                                                 List<LocalTime> horasBase,
                                                 Duration duracion) {

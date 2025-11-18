@@ -210,4 +210,79 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
 
         return colores;
     }
+
+    /**
+     * Aplica k-coloración usando el algoritmo DSatur.
+     * Retorna un mapa donde la clave es el ID del bloque y el valor es el color (día).
+     */
+    public Map<String, Integer> colorearConDSatur() {
+        Map<String, Integer> colores = new HashMap<>();
+        if (nodos.isEmpty()) {
+            return colores;
+        }
+
+        // Mapa de saturación: id -> número de colores distintos en sus vecinos
+        Map<String, Integer> saturacion = new HashMap<>();
+        // Mapa de grado: id -> número de vecinos no coloreados
+        Map<String, Integer> grado = new HashMap<>();
+        List<String> nodosNoColoreados = new ArrayList<>(nodos.keySet());
+
+        for (String id : nodosNoColoreados) {
+            saturacion.put(id, 0);
+            grado.put(id, adyacencias.get(id).size());
+        }
+
+        while (colores.size() < nodos.size()) {
+            // 1. Encontrar el nodo con máxima saturación. En caso de empate, el de mayor grado.
+            String nodoAColorear = null;
+            int maxSat = -1;
+            int maxGrad = -1;
+
+            for (String id : nodosNoColoreados) {
+                int satActual = saturacion.get(id);
+                int gradActual = grado.get(id);
+
+                if (satActual > maxSat || (satActual == maxSat && gradActual > maxGrad)) {
+                    maxSat = satActual;
+                    maxGrad = gradActual;
+                    nodoAColorear = id;
+                }
+            }
+
+            if (nodoAColorear == null) break; // Todos coloreados
+
+            // 2. Encontrar el color más pequeño posible para este nodo
+            Set<Integer> coloresDeVecinos = new HashSet<>();
+            for (String vecinoId : adyacencias.get(nodoAColorear)) {
+                if (colores.containsKey(vecinoId)) {
+                    coloresDeVecinos.add(colores.get(vecinoId));
+                }
+            }
+
+            int colorAsignado = 0;
+            while (coloresDeVecinos.contains(colorAsignado)) {
+                colorAsignado++;
+            }
+
+            // 3. Asignar color y actualizar estructuras
+            colores.put(nodoAColorear, colorAsignado);
+            nodosNoColoreados.remove(nodoAColorear);
+
+            // 4. Actualizar la saturación de los vecinos
+            for (String vecinoId : adyacencias.get(nodoAColorear)) {
+                if (!colores.containsKey(vecinoId)) { // Si el vecino no está coloreado
+                    // Recalcular la saturación del vecino
+                    Set<Integer> coloresDeVecinosDelVecino = new HashSet<>();
+                    for (String vecinoDelVecinoId : adyacencias.get(vecinoId)) {
+                        if (colores.containsKey(vecinoDelVecinoId)) {
+                            coloresDeVecinosDelVecino.add(colores.get(vecinoDelVecinoId));
+                        }
+                    }
+                    saturacion.put(vecinoId, coloresDeVecinosDelVecino.size());
+                }
+            }
+        }
+
+        return colores;
+    }
 }

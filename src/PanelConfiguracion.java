@@ -28,6 +28,7 @@ public class PanelConfiguracion extends JPanel {
     private JTable tablaGrupos;
     private DefaultTableModel modeloGrupos;
     private JTextField txtNombreGrupo;
+    private JSpinner spGradoGrupo;
 
     private JTable tablaSalones;
     private DefaultTableModel modeloSalones;
@@ -242,10 +243,11 @@ public class PanelConfiguracion extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createTitledBorder("Grupos escolares"));
 
-        modeloGrupos = new DefaultTableModel(new String[]{"Nombre del grupo"}, 0) {
+        modeloGrupos = new DefaultTableModel(new String[]{"Grado", "Nombre del grupo"}, 0) {
             @Override public boolean isCellEditable(int row, int column) { return false; }
         };
         tablaGrupos = new JTable(modeloGrupos);
+        tablaGrupos.getColumnModel().getColumn(0).setMaxWidth(60);
         tablaGrupos.getTableHeader().setReorderingAllowed(false);
 
         panel.add(new JScrollPane(tablaGrupos), BorderLayout.CENTER);
@@ -253,12 +255,15 @@ public class PanelConfiguracion extends JPanel {
         JPanel formulario = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtNombreGrupo = new JTextField(15);
         JButton btnAgregar = new JButton("Registrar grupo");
+        spGradoGrupo = new JSpinner(new SpinnerNumberModel(1, 1, 6, 1));
         JButton btnEliminar = new JButton("Eliminar seleccionado");
 
         btnAgregar.addActionListener(e -> guardarGrupo());
         btnEliminar.addActionListener(e -> eliminarGrupoSeleccionado());
 
-        formulario.add(new JLabel("Nombre (p.e. 1°B):"));
+        formulario.add(new JLabel("Grado:"));
+        formulario.add(spGradoGrupo);
+        formulario.add(new JLabel("Nombre (p.e. 'A', 'B'):"));
         formulario.add(txtNombreGrupo);
         formulario.add(btnAgregar);
         formulario.add(btnEliminar);
@@ -268,12 +273,14 @@ public class PanelConfiguracion extends JPanel {
 
     private void guardarGrupo() {
         String nombre = txtNombreGrupo.getText().trim();
+        int grado = (Integer) spGradoGrupo.getValue();
         if (nombre.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Nombre de grupo vacío.", "Validación", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        GrupoEstudiantes grupo = new GrupoEstudiantes(nombre);
+        GrupoEstudiantes grupo = new GrupoEstudiantes(nombre, grado);
         catalogo.addGrupo(grupo);
+        spGradoGrupo.setValue(1);
         txtNombreGrupo.setText("");
         cargarGruposEnTabla();
         refrescarCombosAsignaciones();
@@ -282,8 +289,12 @@ public class PanelConfiguracion extends JPanel {
     private void eliminarGrupoSeleccionado() {
         int fila = tablaGrupos.getSelectedRow();
         if (fila < 0) return;
-        String nombre = (String) modeloGrupos.getValueAt(fila, 0);
-        catalogo.findGrupoByName(nombre).ifPresent(g -> catalogo.removeGrupo(g.getId()));
+        // Obtener grado y nombre para una búsqueda precisa
+        int grado = (Integer) modeloGrupos.getValueAt(fila, 0);
+        String nombre = (String) modeloGrupos.getValueAt(fila, 1);
+        catalogo.getTodosLosGrupos().stream()
+                .filter(g -> g.getGrado() == grado && g.getNombre().equals(nombre))
+                .findFirst().ifPresent(g -> catalogo.removeGrupo(g.getId()));
         cargarGruposEnTabla();
         refrescarCombosAsignaciones();
     }
@@ -551,6 +562,12 @@ public class PanelConfiguracion extends JPanel {
         );
         catalogo.addAsignacionAcademica(asignacion);
 
+        // Feedback inmediato al usuario
+        JOptionPane.showMessageDialog(this,
+                "✓ Asignación creada exitosamente\n" +
+                "  Se generaron " + horas + " bloques de 1 hora para el grupo " + grupo.getNombre(),
+                "Generación completada", JOptionPane.INFORMATION_MESSAGE);
+
         spHorasAsignacion.setValue(5);
         chkMateriaLibre.setSelected(false);
         actualizarMateriaPorProfesor();
@@ -622,7 +639,7 @@ public class PanelConfiguracion extends JPanel {
     private void cargarGruposEnTabla() {
         modeloGrupos.setRowCount(0);
         for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
-            modeloGrupos.addRow(new Object[]{grupo.getNombre()});
+            modeloGrupos.addRow(new Object[]{grupo.getGrado(), grupo.getNombre()});
         }
     }
 
@@ -683,7 +700,7 @@ public class PanelConfiguracion extends JPanel {
             Salon salon = asignacion.getSalonId() != null ? catalogo.obtenerSalonPorId(asignacion.getSalonId()) : null;
 
             modeloAsignaciones.addRow(new Object[]{
-                    grupo != null ? grupo.getNombre() : "(Grupo eliminado)",
+                    grupo != null ? grupo.toString() : "(Grupo eliminado)",
                     materia != null ? materia.getNombre() : "(Materia eliminada)",
                     profesor != null ? profesor.getNombre() : "(Profesor eliminado)",
                     asignacion.getHorasSemanales(),
@@ -759,8 +776,8 @@ public class PanelConfiguracion extends JPanel {
 
     private void marcarSeleccion(JCheckBox[] checks, List<String> valores) {
         if (valores == null || valores.isEmpty()) {
-            seleccionarTodos(checks, true);
-            return;
+            // Si la lista está vacía, significa que ninguno está seleccionado, no todos.
+            seleccionarTodos(checks, false);
         }
         for (JCheckBox check : checks) {
             check.setSelected(valores.contains(check.getText()));
@@ -774,7 +791,7 @@ public class PanelConfiguracion extends JPanel {
         }
         for (int i = 0; i < combo.getItemCount(); i++) {
             Materia materia = combo.getItemAt(i);
-            if (materia.getNombre().equalsIgnoreCase(nombreMateria)) {
+            if (materia != null && materia.getNombre().equalsIgnoreCase(nombreMateria)) {
                 combo.setSelectedIndex(i);
                 return;
             }
@@ -822,4 +839,3 @@ public class PanelConfiguracion extends JPanel {
         panel.add(componente, gbc);
     }
 }
-
