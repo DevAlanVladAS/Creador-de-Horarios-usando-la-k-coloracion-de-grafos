@@ -75,18 +75,28 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     }
 
     private boolean hayConflicto(BloqueHorario a, BloqueHorario b) {
-        // Si no se solapan en tiempo, no hay conflicto
-        if (!a.seSolapaCon(b)) {
+        // Lógica de solapamiento de tiempo, movida desde BloqueHorario.
+        boolean seSolapanEnTiempo;
+        if (a.getHoraInicio() == null || a.getHoraFin() == null || b.getHoraInicio() == null || b.getHoraFin() == null) {
+            // Si las horas no están definidas, se asume que hay un posible conflicto de tiempo
+            // para que se evalúen los recursos. Esto es crucial para la fase de coloración
+            // antes de la asignación de horas.
+            seSolapanEnTiempo = true;
+        } else {
+            // Lógica de solapamiento: A empieza antes de que B termine Y B empieza antes de que A termine.
+            seSolapanEnTiempo = a.getHoraInicio().isBefore(b.getHoraFin()) && b.getHoraInicio().isBefore(a.getHoraFin());
+        }
+
+        // Si no se solapan en tiempo, no puede haber conflicto.
+        if (!seSolapanEnTiempo) {
             return false;
         }
 
-        // Si se solapan en tiempo, verificar si comparten recursos
+        // Si se solapan (o podrían solaparse) en tiempo, verificar si comparten recursos.
         boolean mismoProfesor = a.getProfesorId() != null &&
                 a.getProfesorId().equals(b.getProfesorId());
-
         boolean mismoSalon = a.getSalonId() != null &&
                 a.getSalonId().equals(b.getSalonId());
-
         boolean mismoGrupo = a.getGrupoId() != null &&
                 a.getGrupoId().equals(b.getGrupoId());
 

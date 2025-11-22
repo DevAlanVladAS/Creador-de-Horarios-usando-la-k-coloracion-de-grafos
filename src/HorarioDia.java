@@ -35,24 +35,23 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
 
 
     @Override
-    public void agregar(HorarioComponente comp) {
+    public boolean agregar(HorarioComponente comp) {
         if (!(comp instanceof BloqueHorario)) {
             throw new IllegalArgumentException("Solo se pueden agregar bloques horarios");
         }
 
         BloqueHorario bloque = (BloqueHorario) comp;
 
+        // Si hay traslape, no se puede agregar.
+        if (!checkNoTraslape(bloque)) {
+            return false;
+        }
 
+        // Si no hay traslape, se agrega.
         bloquesHorario.remove(bloque);
-
-       
-        validarNoTraslape(bloque);
-
-  
         bloque.setDia(this.dia);
-
-
         bloquesHorario.add(bloque);
+        return true;
     }
 
     @Override
@@ -78,11 +77,13 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
         }
     }
 
- 
-    private void validarNoTraslape(BloqueHorario nuevo) {
+    /**
+     * Comprueba si un nuevo bloque se traslapa con los existentes.
+     * @param nuevo El bloque a comprobar.
+     * @return `true` si no hay traslape, `false` si lo hay.
+     */
+    private boolean checkNoTraslape(BloqueHorario nuevo) {
         for (BloqueHorario existente : bloquesHorario) {
-            // Si alguno de los bloques no tiene hora de inicio, no podemos validar traslape.
-            // Esto es importante durante la generación automática, antes de la Fase 3.
             if (nuevo.getHoraInicio() == null || existente.getHoraInicio() == null) {
                 continue;
             }
@@ -94,11 +95,9 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
                     !nuevo.getHoraInicio().isAfter(existente.getHoraFin());
 
             if (seTraslapan) {
-                throw new IllegalArgumentException(
-                        "El bloque con ID " + nuevo.getId() +
-                        " se traslapa con otro bloque ya asignado en el día " + dia
-                );
+                return false; // Hay traslape
             }
         }
+        return true; // No hay traslape
     }
 }
