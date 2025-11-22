@@ -9,11 +9,13 @@ import java.util.stream.Collectors;
 
 /**
  * Panel centralizado para administrar profesores, grupos, salones, materias y asignaciones.
+ * Implementa HorarioChangeListener para recibir notificaciones de cambios en el modelo.
  */
-public class PanelConfiguracion extends JPanel {
+public class PanelConfiguracion extends JPanel implements GestorHorarios.HorarioChangeListener {
 
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
-    private final boolean permitirGestionGrupos;
+    private final GestorHorarios gestorHorarios = GestorHorarios.getInstance();
+   
     private final boolean permitirAsignaciones;
     private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
     private final String[] HORAS_CLASE = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00"};
@@ -27,10 +29,6 @@ public class PanelConfiguracion extends JPanel {
     private JCheckBox[] checkHoras;
     private Profesor profesorEnEdicion;
 
-    private JTable tablaGrupos;
-    private DefaultTableModel modeloGrupos;
-    private JTextField txtNombreGrupo;
-    private JSpinner spGradoGrupo;
 
     private JTable tablaSalones;
     private DefaultTableModel modeloSalones;
@@ -53,15 +51,11 @@ public class PanelConfiguracion extends JPanel {
     private JCheckBox chkMateriaLibre;
 
     private Materia materiaEnEdicion;
-
-    private JDialog parentDialog;
-
     public PanelConfiguracion() {
-        this(true, true);
+        this(true);
     }
 
-    public PanelConfiguracion(boolean permitirGestionGrupos, boolean permitirAsignaciones) {
-        this.permitirGestionGrupos = permitirGestionGrupos;
+    public PanelConfiguracion( boolean permitirAsignaciones) {
         this.permitirAsignaciones = permitirAsignaciones;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -72,7 +66,6 @@ public class PanelConfiguracion extends JPanel {
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Profesores", crearPanelProfesores());
-        tabs.addTab("Grupos", crearPanelGrupos());
         tabs.addTab("Salones", crearPanelSalones());
         tabs.addTab("Materias", crearPanelMaterias());
         tabs.addTab("Asignaciones", crearPanelAsignaciones());
@@ -92,9 +85,6 @@ public class PanelConfiguracion extends JPanel {
         return panel;
     }
 
-    public void setParentDialog(JDialog parentDialog) {
-        this.parentDialog = parentDialog;
-    }
 
     // ----------------------------------------------------
     // PROFESORES
@@ -156,7 +146,7 @@ public class PanelConfiguracion extends JPanel {
                 return this;
             }
         });
-        spHorasProfesor = new JSpinner(new SpinnerNumberModel(5, 1, 30, 1));
+        spHorasProfesor = new JSpinner(new SpinnerNumberModel(5, 1, 35, 1));
 
         checkDias = new JCheckBox[DIAS_SEMANA.length];
         checkHoras = new JCheckBox[HORAS_CLASE.length];
@@ -253,34 +243,7 @@ public class PanelConfiguracion extends JPanel {
         seleccionarTodos(checkHoras, true);
     }
 
-    // ----------------------------------------------------
-    // GRUPOS
-    // ----------------------------------------------------
 
-    private JPanel crearPanelGrupos() {
-        if (!permitirGestionGrupos) {
-            return crearPanelSoloLectura("Los grupos se generan al iniciar un proyecto. Usa el configurador de 'Nuevo proyecto' para definirlos.");
-        }
-
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setBorder(BorderFactory.createTitledBorder("Grupos escolares"));
-
-        modeloGrupos = new DefaultTableModel(new String[]{"Grado", "Nombre del grupo"}, 0) {
-            @Override public boolean isCellEditable(int row, int column) { return false; }
-        };
-        tablaGrupos = new JTable(modeloGrupos);
-        tablaGrupos.getColumnModel().getColumn(0).setMaxWidth(60);
-        tablaGrupos.getTableHeader().setReorderingAllowed(false);
-
-        panel.add(new JScrollPane(tablaGrupos), BorderLayout.CENTER);
-
-        JPanel aviso = new JPanel(new BorderLayout());
-        JLabel lblInfo = new JLabel("<html>Los grupos solo pueden editarse desde la configuración del proyecto actual.</html>");
-        lblInfo.setHorizontalAlignment(SwingConstants.LEFT);
-        aviso.add(lblInfo, BorderLayout.CENTER);
-        panel.add(aviso, BorderLayout.SOUTH);
-        return panel;
-    }
     private JPanel crearPanelSalones() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createTitledBorder("Salones de clase"));
@@ -295,7 +258,7 @@ public class PanelConfiguracion extends JPanel {
         txtNombreSalon = new JTextField(12);
         spCapacidadSalon = new JSpinner(new SpinnerNumberModel(30, 5, 60, 1));
 
-        JButton btnAgregar = new JButton("Agregar salón");
+        JButton btnAgregar = new JButton("Agregar salon");
         JButton btnEliminar = new JButton("Eliminar seleccionado");
 
         btnAgregar.addActionListener(e -> guardarSalon());
@@ -440,7 +403,7 @@ public class PanelConfiguracion extends JPanel {
 
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        modeloAsignaciones = new DefaultTableModel(new String[]{"Grupo", "Materia", "Profesor", "Horas", "Salón", "ID"}, 0) {
+        modeloAsignaciones = new DefaultTableModel(new String[]{"Grupo", "Materia", "Profesor", "Horas", "Salon", "ID"}, 0) {
             @Override public boolean isCellEditable(int row, int column) { return false; }
         };
         tablaAsignaciones = new JTable(modeloAsignaciones);
@@ -462,7 +425,7 @@ public class PanelConfiguracion extends JPanel {
         cmbMateriaAsignacion = new JComboBox<>();
         cmbProfesorAsignacion = new JComboBox<>();
         cmbSalonAsignacion = new JComboBox<>();
-        spHorasAsignacion = new JSpinner(new SpinnerNumberModel(1, 1, 10, 1));
+        spHorasAsignacion = new JSpinner(new SpinnerNumberModel(1, 1, 6, 1));
 
         gbc.gridx = 0; gbc.gridy = 0; formulario.add(new JLabel("Grupo:"), gbc);
         gbc.gridx = 1; formulario.add(cmbGrupoAsignacion, gbc);
@@ -538,15 +501,47 @@ public class PanelConfiguracion extends JPanel {
         );
         catalogo.addAsignacionAcademica(asignacion);
 
+        // Generar bloques a través de GestorHorarios
+        generarBloquesParaAsignacion(asignacion);
+
         asignacionEnEdicion = null;
         cargarAsignacionesEnTabla();
         refrescarCombosAsignaciones();
         limpiarFormularioAsignacion();
 
         JOptionPane.showMessageDialog(this,
-                "Asignación guardada correctamente.",
+                "Asignación guardada correctamente. Se generaron " + horas + " bloques horarios.",
                 "Asignaciones",
                 JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * Genera bloques horarios para una asignación a través de GestorHorarios.
+     */
+    private void generarBloquesParaAsignacion(AsignacionAcademica asignacion) {
+        Profesor profesor = catalogo.obtenerProfesorPorId(asignacion.getProfesorId());
+        Materia materia = catalogo.obtenerMateriaPorId(asignacion.getMateriaId());
+        
+        if (profesor == null || materia == null) {
+            return;
+        }
+
+        // Generar bloques sin posición inicial (serán colocados vía drag & drop o automáticamente)
+        for (int i = 0; i < asignacion.getHorasSemanales(); i++) {
+            // Crear bloque sin hora (será asignada luego vía UI o automáticamente)
+            BloqueHorario bloque = new BloqueHorario(
+                    null,  // horaInicio - será asignada luego
+                    null,  // horaFin - será asignada luego
+                    materia.getNombre(),
+                    asignacion.getProfesorId(),
+                    asignacion.getSalonId(),
+                    asignacion.getGrupoId(),
+                    true   // ids = true para indicar que los últimos 3 parámetros son IDs
+            );
+            
+            // Agregar el bloque al gestor (automáticamente registra listeners)
+            gestorHorarios.agregarBloque(bloque, asignacion.getGrupoId());
+        }
     }
 
     private void editarAsignacionSeleccionada() {
@@ -630,13 +625,6 @@ public class PanelConfiguracion extends JPanel {
         }
     }
 
-    private void cargarGruposEnTabla() {
-        if (modeloGrupos == null) return;
-        modeloGrupos.setRowCount(0);
-        for (GrupoEstudiantes grupo : catalogo.getTodosLosGrupos()) {
-            modeloGrupos.addRow(new Object[]{grupo.getGrado(), grupo.getNombre()});
-        }
-    }
 
     private void cargarSalonesEnTabla() {
         modeloSalones.setRowCount(0);
@@ -878,24 +866,47 @@ public class PanelConfiguracion extends JPanel {
                 .orElse(null);
     }
 
-    private void agregarCampoFormulario(JPanel panel, GridBagConstraints gbc, int fila, String etiqueta, JComponent componente) {
-        gbc.gridx = 0;
-        gbc.gridy = fila;
-        gbc.weightx = 0;
-        panel.add(new JLabel(etiqueta), gbc);
-
-        gbc.gridx = 1;
-        gbc.weightx = 1;
-        panel.add(componente, gbc);
-    }
 
     private void recargarDatos() {
         cargarProfesoresEnTabla();
-        cargarGruposEnTabla();
         cargarSalonesEnTabla();
         cargarMateriasEnTabla();
         cargarMateriasEnCombos();
         cargarAsignacionesEnTabla();
         refrescarCombosAsignaciones();
+    }
+
+    @Override
+    public void onBloquesChanged(String grupoId, GestorHorarios.TipoCambio tipoCambio, BloqueHorario bloqueAfectado) {
+        // Recargar datos cuando hay cambios significativos
+        switch (tipoCambio) {
+            case REEMPLAZO_COMPLETO:
+            case ESTRUCTURA_CAMBIADA:
+                SwingUtilities.invokeLater(this::recargarDatos);
+                break;
+            case BLOQUE_AGREGADO:
+            case BLOQUE_ELIMINADO:
+            case BLOQUE_MODIFICADO:
+                // Para cambios específicos de bloques, podríamos actualizar solo lo necesario
+                // Por ahora, recargamos todo por seguridad
+                SwingUtilities.invokeLater(this::recargarDatos);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Se debe llamar cuando PanelConfiguracion se agrega a la interfaz.
+     */
+    public void registrarCommoListener() {
+        gestorHorarios.addListener(this);
+    }
+
+    /**
+     * Se debe llamar cuando PanelConfiguracion se remueve de la interfaz.
+     */
+    public void desregistrarComoListener() {
+        gestorHorarios.removeListener(this);
     }
 }

@@ -3,7 +3,7 @@ import java.util.List;
 
 public interface HorarioComponente {
 
-    public void agregar(HorarioComponente comp);
+    public boolean agregar(HorarioComponente comp);
 
     public void eliminar(HorarioComponente comp);
 

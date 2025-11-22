@@ -10,17 +10,18 @@ import java.util.Queue;
 
 /**
  * Anima la colocación de bloques en el horario después de la generación automática.
+ * Ahora funciona a través de GestorHorarios para actualizar el modelo.
  */
 public class AnimadorHorario {
 
-    private final PanelHorario panelHorario;
+    private final GestorHorarios gestor;
     private final Queue<BloqueHorario> colaDeBloques;
     private final Timer timer;
     private final JLabel estadoLabel;
     private final Runnable alFinalizar;
 
-    public AnimadorHorario(PanelHorario panelHorario, List<BloqueHorario> bloquesAAsignar, JLabel estadoLabel, Runnable alFinalizar) {
-        this.panelHorario = panelHorario;
+    public AnimadorHorario(List<BloqueHorario> bloquesAAsignar, JLabel estadoLabel, Runnable alFinalizar) {
+        this.gestor = GestorHorarios.getInstance();
         this.colaDeBloques = new LinkedList<>(bloquesAAsignar);
         this.estadoLabel = estadoLabel;
         this.alFinalizar = alFinalizar;
@@ -33,7 +34,6 @@ public class AnimadorHorario {
             public void actionPerformed(ActionEvent e) {
                 if (colaDeBloques.isEmpty()) {
                     timer.stop();
-                    panelHorario.actualizarMerges();
                     if (estadoLabel != null) {
                         estadoLabel.setText("Estado: Animación completada.");
                     }
@@ -45,7 +45,8 @@ public class AnimadorHorario {
 
                 BloqueHorario bloque = colaDeBloques.poll();
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
-                    panelHorario.moverBloqueACelda(bloque);
+                    // Actualizar posición a través del gestor para notificar observers
+                    gestor.actualizarPosicionBloque(bloque, bloque.getDia(), bloque.getHoraInicio());
                 }
 
                 if (estadoLabel != null) {
