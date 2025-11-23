@@ -7,40 +7,43 @@ import java.awt.dnd.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+/**
+ * Vista de horario por grupo. Soporta drag & drop y mantiene el panel de "sin asignar" fijo.
+ */
 public class PanelHorario extends JPanel implements GestorHorarios.HorarioChangeListener {
 
     private static final DateTimeFormatter HORA_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private final LocalTime[] HORAS_DIA = PlantillaHoraria.BLOQUES_ESTANDAR.toArray(new LocalTime[0]);
-    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
+    private static final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
 
+    private final LocalTime[] HORAS_DIA = PlantillaHoraria.BLOQUES_ESTANDAR.toArray(new LocalTime[0]);
     private final JPanel gridPanel;
     private final PanelSinAsignar panelSinAsignar;
     private final List<CeldaHorario> celdas = new ArrayList<>();
     private final DropTargetListener dropListenerCelda;
-    
+
     private final GestorHorarios gestor;
     private final String grupoId;
-    
+
     private boolean refrescando = false;
 
     public PanelHorario(String grupoId) {
         this.grupoId = grupoId;
         this.gestor = GestorHorarios.getInstance();
-        
+
         setLayout(new BorderLayout(10, 10));
 
         gridPanel = new JPanel(new GridLayout(HORAS_DIA.length + 1, DIAS_SEMANA.length + 1));
         gridPanel.setBackground(Color.WHITE);
 
         dropListenerCelda = new CeldaDropListener();
-        panelSinAsignar = new PanelSinAsignar();
+        panelSinAsignar = new PanelSinAsignar(gestor);
 
         construirUI();
-        
         gestor.addListener(this);
-        
         refrescarVista();
     }
 
@@ -61,12 +64,10 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             }
         }
 
-        // Panel central con grid horario
         JScrollPane scrollGrid = new JScrollPane(gridPanel);
         scrollGrid.getVerticalScrollBar().setUnitIncrement(10);
         add(scrollGrid, BorderLayout.CENTER);
 
-        // Panel derecho FIJO para bloques sin asignar
         JScrollPane scrollSinAsignar = new JScrollPane(panelSinAsignar);
         scrollSinAsignar.setBorder(BorderFactory.createEmptyBorder());
         scrollSinAsignar.setPreferredSize(new Dimension(260, 0));
@@ -76,85 +77,58 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         JPanel contenedor = new JPanel(new BorderLayout(5, 5));
         contenedor.setBorder(BorderFactory.createTitledBorder("Bloques sin asignar"));
         contenedor.add(scrollSinAsignar, BorderLayout.CENTER);
-        contenedor.setBounds(50, 50, 150, 75);
         add(contenedor, BorderLayout.EAST);
     }
 
     @Override
-    public void onBloquesChanged(String grupoIdAfectado, GestorHorarios.TipoCambio tipoCambio, 
-                                BloqueHorario bloqueAfectado) {
+    public void onBloquesChanged(String grupoIdAfectado, GestorHorarios.TipoCambio tipoCambio, BloqueHorario bloqueAfectado) {
         if (grupoIdAfectado == null || grupoIdAfectado.equals(this.grupoId)) {
             SwingUtilities.invokeLater(this::refrescarVista);
         }
     }
 
     private void refrescarVista() {
-        
         if (refrescando) return;
-        
+
         try {
             refrescando = true;
-            
-            // IMPORTANTE: Limpiar SOLO celdas y panel sin asignar
-            // Sin destruir componentes existentes
-            for (CeldaHorario celda : celdas) {
-                celda.reset();
-            }
+
+            celdas.forEach(CeldaHorario::reset);
             panelSinAsignar.resetContenido();
 
             List<BloqueHorario> bloques = gestor.getBloquesGrupo(grupoId);
+            Set<String> asignados = new HashSet<>();
 
-            // Colocar bloques en posiciones existentes, evitando duplicados
             for (BloqueHorario bloque : bloques) {
                 LocalTime horaInicio = bloque.getHoraInicio();
-                LocalTime horaNormalizada = horaInicio != null ? 
-                    horaInicio.withSecond(0).withNano(0) : null;
+                LocalTime horaNormalizada = horaInicio != null ? horaInicio.withSecond(0).withNano(0) : null;
 
                 if (bloque.getDia() != null && horaNormalizada != null) {
                     CeldaHorario celda = getCelda(bloque.getDia(), horaNormalizada);
-                    if (celda != null && celda.obtenerBloquePanel() == null) {
-                        // IMPORTANTE: Solo colocar si la celda está vacía
-                        BloquePanel panel = new BloquePanel(bloque);
-                        celda.colocarBloque(panel);
-                        continue;
+                    if (celda != null) {
+                        BloquePanel existente = celda.obtenerBloquePanel();
+                        if (existente == null || existente.getBloque().getId().equals(bloque.getId())) {
+                            BloquePanel panel = new BloquePanel(bloque);
+                            celda.colocarBloque(panel);
+                            asignados.add(bloque.getId());
+                            continue;
+                        }
                     }
                 }
-                // Si no se pudo colocar en grid, ponerlo en sin asignar
-                agregarBloqueSinAsignar(bloque);
+                if (!asignados.contains(bloque.getId())) {
+                    agregarBloqueSinAsignar(bloque);
+                }
             }
 
             actualizarMerges();
             panelSinAsignar.actualizarEstadoVacio();
             revalidate();
             repaint();
-            
+
         } finally {
             refrescando = false;
         }
     }
-
-    public void cargarBloques(List<BloqueHorario> nuevosBloques) {
-        HorarioSemana semana = gestor.getHorarioSemana(grupoId);
-        
-        for (BloqueHorario bloqueExistente : semana.getBloques()) {
-            semana.eliminarBloque(bloqueExistente.getId());
-        }
-        
-        for (BloqueHorario nuevoBloque : nuevosBloques) {
-            if (nuevoBloque.getGrupoId() == null || !nuevoBloque.getGrupoId().equals(grupoId)) {
-                nuevoBloque.setGrupoId(grupoId);
-            }
-            
-            gestor.agregarBloque(nuevoBloque, grupoId);
-            
-            if (nuevoBloque.getDia() != null && nuevoBloque.getHoraInicio() != null) {
-                gestor.actualizarPosicionBloque(nuevoBloque, 
-                    nuevoBloque.getDia(), 
-                    nuevoBloque.getHoraInicio());
-            }
-        }
-    }
-
 
     private CeldaHorario getCelda(String dia, LocalTime hora) {
         for (CeldaHorario celda : celdas) {
@@ -172,21 +146,6 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         panelSinAsignar.addBloquePanel(panel);
     }
 
-    public List<BloquePanel> getAllBloquePanels() {
-        List<BloquePanel> lista = new ArrayList<>();
-        for (CeldaHorario celda : celdas) {
-            if (celda.obtenerBloquePanel() != null) {
-                lista.add(celda.obtenerBloquePanel());
-            }
-        }
-        for (Component comp : panelSinAsignar.getComponents()) {
-            if (comp instanceof BloquePanel) {
-                lista.add((BloquePanel) comp);
-            }
-        }
-        return lista;
-    }
-
     private boolean esDisponibleParaProfesor(String profesorId, String dia, LocalTime hora) {
         if (profesorId == null) return true;
 
@@ -197,7 +156,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         List<String> diasDisponibles = profesor.getDiasDisponibles();
         if (diasDisponibles != null && !diasDisponibles.isEmpty()) {
             boolean diaEncontrado = diasDisponibles.stream()
-                .anyMatch(d -> d.equalsIgnoreCase(dia));
+                    .anyMatch(d -> d.equalsIgnoreCase(dia));
             if (!diaEncontrado) {
                 return false;
             }
@@ -208,7 +167,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         if (horasDisponibles != null && !horasDisponibles.isEmpty()) {
             return horasDisponibles.contains(horaFormateada);
         }
-        
+
         return true;
     }
 
@@ -245,11 +204,9 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         BloqueHorario bloqueA = a.getBloque();
         BloqueHorario bloqueB = b.getBloque();
         if (bloqueA == null || bloqueB == null) return false;
-        
-        boolean mismaMateria = bloqueA.getMateria() != null
-                && bloqueA.getMateria().equalsIgnoreCase(bloqueB.getMateria());
-        boolean mismoProfesor = bloqueA.getProfesorId() != null
-                && bloqueA.getProfesorId().equals(bloqueB.getProfesorId());
+
+        boolean mismaMateria = bloqueA.getMateria() != null && bloqueA.getMateria().equalsIgnoreCase(bloqueB.getMateria());
+        boolean mismoProfesor = bloqueA.getProfesorId() != null && bloqueA.getProfesorId().equals(bloqueB.getProfesorId());
         return mismaMateria && mismoProfesor;
     }
 
@@ -301,8 +258,19 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             new DropTarget(this, DnDConstants.ACTION_MOVE, listener, true);
         }
 
-        public String getDia() { return dia; }
-        public LocalTime getHora() { return hora; }
+        public BloquePanel obtenerBloquePanel() {
+            if (getComponentCount() == 0) return null;
+            Component comp = getComponent(0);
+            return (comp instanceof BloquePanel) ? (BloquePanel) comp : null;
+        }
+
+        public String getDia() {
+            return dia;
+        }
+
+        public LocalTime getHora() {
+            return hora;
+        }
 
         public void colocarBloque(BloquePanel panel) {
             BloquePanel ocupanteActual = obtenerBloquePanel();
@@ -312,16 +280,16 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
                     panelSinAsignarRef.addBloquePanel(ocupanteActual);
                 }
             }
+            Container parent = panel.getParent();
+            if (parent != null && parent != this) {
+                parent.remove(panel);
+                parent.revalidate();
+                parent.repaint();
+            }
             removeAll();
             add(panel, BorderLayout.CENTER);
             revalidate();
             repaint();
-        }
-
-        public BloquePanel obtenerBloquePanel() {
-            if (getComponentCount() == 0) return null;
-            Component comp = getComponent(0);
-            return (comp instanceof BloquePanel) ? (BloquePanel) comp : null;
         }
 
         public void reset() {
@@ -362,52 +330,49 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         @Override
         public void drop(DropTargetDropEvent dtde) {
             Component comp = dtde.getDropTargetContext().getComponent();
-            if (!(comp instanceof CeldaHorario)) { 
-                dtde.rejectDrop(); 
-                return; 
+            if (!(comp instanceof CeldaHorario)) {
+                dtde.rejectDrop();
+                return;
             }
-            
+
             CeldaHorario celda = (CeldaHorario) comp;
             boolean aceptado = false;
-            
+
             try {
                 Transferable tr = dtde.getTransferable();
                 if (!tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
                     dtde.rejectDrop();
                     return;
                 }
-                
+
                 BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
-                
-                // IMPORTANTE: Validar que no es duplicado (bloque ya en esta celda)
+
                 BloquePanel existente = celda.obtenerBloquePanel();
                 if (existente != null && existente.getBloque().getId().equals(bloqueTransferido.getId())) {
                     dtde.rejectDrop();
                     return;
                 }
-                
+
                 if (!esDisponibleParaProfesor(bloqueTransferido.getProfesorId(), celda.dia, celda.hora)) {
                     dtde.rejectDrop();
-                    JOptionPane.showMessageDialog(null, 
-                        "El profesor no está disponible en este día/hora.",
-                        "Restricción de disponibilidad", 
-                        JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(null,
+                            "El profesor no está disponible en este día/hora.",
+                            "Restricción de disponibilidad",
+                            JOptionPane.WARNING_MESSAGE);
                     return;
                 }
-                
+
                 dtde.acceptDrop(DnDConstants.ACTION_MOVE);
                 aceptado = true;
-                
-                // IMPORTANTE: Flag para evitar refrescada durante drop
+
                 refrescando = true;
                 gestor.actualizarPosicionBloque(bloqueTransferido, celda.dia, celda.hora);
                 refrescando = false;
-                
-                // Refrescar SOLO después de completar
+
                 SwingUtilities.invokeLater(PanelHorario.this::refrescarVista);
-                
+
                 dtde.dropComplete(true);
-                
+
             } catch (Exception e) {
                 e.printStackTrace();
                 if (!aceptado) {
@@ -422,10 +387,12 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
-    protected class PanelSinAsignar extends JPanel implements DropTargetListener {
+    public static class PanelSinAsignar extends JPanel implements DropTargetListener {
         private final JLabel lblEmpty;
+        private final GestorHorarios gestor;
 
-        public PanelSinAsignar() {
+        public PanelSinAsignar(GestorHorarios gestor) {
+            this.gestor = gestor != null ? gestor : GestorHorarios.getInstance();
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBackground(new Color(248, 248, 248));
             setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -443,6 +410,10 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
 
         void addBloquePanel(BloquePanel panel) {
+            Container parent = panel.getParent();
+            if (parent != null && parent != this) {
+                parent.remove(panel);
+            }
             if (lblEmpty.getParent() == this) {
                 remove(lblEmpty);
             }
@@ -469,13 +440,11 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
 
         @Override public void dragEnter(DropTargetDragEvent dtde) {
             setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(78, 115, 223), 2),
-                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+                    BorderFactory.createLineBorder(new Color(78, 115, 223), 2),
+                    BorderFactory.createEmptyBorder(8, 8, 8, 8)));
         }
-        
         @Override public void dragOver(DropTargetDragEvent dtde) {}
         @Override public void dropActionChanged(DropTargetDragEvent dtde) {}
-        
         @Override public void dragExit(DropTargetEvent dte) {
             setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         }
@@ -486,11 +455,8 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
                 Transferable tr = dtde.getTransferable();
                 if (tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
                     dtde.acceptDrop(DnDConstants.ACTION_MOVE);
-                    
                     BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
-                    
                     gestor.actualizarPosicionBloque(bloqueTransferido, null, null);
-                    
                     dtde.dropComplete(true);
                 } else {
                     dtde.rejectDrop();
@@ -505,7 +471,6 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
     }
 
     public static PanelHorario.PanelSinAsignar crearPanelSinAsignar() {
-        PanelHorario temp = new PanelHorario("TEMP_GROUP");
-        return temp.new PanelSinAsignar();
+        return new PanelSinAsignar(GestorHorarios.getInstance());
     }
 }

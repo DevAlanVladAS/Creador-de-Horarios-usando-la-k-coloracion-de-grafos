@@ -47,8 +47,8 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
             return false;
         }
 
-        // Si no hay traslape, se agrega.
-        bloquesHorario.remove(bloque);
+        // Asegurar que no queden duplicados por ID.
+        bloquesHorario.removeIf(b -> b.getId().equals(bloque.getId()));
         bloque.setDia(this.dia);
         bloquesHorario.add(bloque);
         return true;
@@ -61,8 +61,7 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
         }
 
         BloqueHorario bloque = (BloqueHorario) comp;
-
-        boolean removed = bloquesHorario.remove(bloque);
+        boolean removed = bloquesHorario.removeIf(b -> b.getId().equals(bloque.getId()));
 
         if (removed) {
             bloque.setDia(null);
@@ -88,11 +87,11 @@ public class HorarioDia implements HorarioComponente, java.io.Serializable {
                 continue;
             }
 
-            if (existente == nuevo) continue;
+            if (existente.getId().equals(nuevo.getId())) continue;
 
             boolean seTraslapan =
-                    !nuevo.getHoraFin().isBefore(existente.getHoraInicio()) &&
-                    !nuevo.getHoraInicio().isAfter(existente.getHoraFin());
+                    nuevo.getHoraInicio().isBefore(existente.getHoraFin()) &&
+                    nuevo.getHoraFin().isAfter(existente.getHoraInicio());
 
             if (seTraslapan) {
                 return false; // Hay traslape

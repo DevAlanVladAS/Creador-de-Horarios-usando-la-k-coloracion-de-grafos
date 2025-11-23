@@ -7,7 +7,7 @@ import java.util.UUID;
 public class Profesor {
     private static final int HORAS_POR_DEFECTO = 5;
 
-    private final String id = UUID.randomUUID().toString();
+    private final String id;
     private String nombre;
     private String materiaAsignada;
     
@@ -16,12 +16,12 @@ public class Profesor {
     private List<String> horasDisponibles; 
     private int horasSemanales; // Total de horas a trabajar a la semana
 
-    public Profesor(String nombre,
-                    String materiaAsignada,
-                    List<String> diasDisponibles,
-                    List<String> horasDisponibles,
-                    int horasSemanales) {
+    public Profesor(String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles, int horasSemanales) {
+        this(null, nombre, materiaAsignada, diasDisponibles, horasDisponibles, horasSemanales);
+    }
 
+    public Profesor(String id, String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles, int horasSemanales) {
+        this.id = (id == null || id.isBlank()) ? UUID.randomUUID().toString() : id.trim();
         this.nombre = nombre;
         this.materiaAsignada = materiaAsignada;
         this.diasDisponibles = diasDisponibles != null ? new ArrayList<>(diasDisponibles) : new ArrayList<>();
@@ -29,10 +29,7 @@ public class Profesor {
         this.horasSemanales = horasSemanales > 0 ? horasSemanales : HORAS_POR_DEFECTO;
     }
 
-    public Profesor(String nombre,
-                    String materiaAsignada,
-                    List<String> diasDisponibles,
-                    List<String> horasDisponibles) {
+    public Profesor(String nombre, String materiaAsignada, List<String> diasDisponibles, List<String> horasDisponibles) {
         this(nombre, materiaAsignada, diasDisponibles, horasDisponibles, HORAS_POR_DEFECTO);
     }
 
