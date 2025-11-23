@@ -1,11 +1,15 @@
-package src;
-
+﻿package src;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Comparator;
+import javax.imageio.ImageIO;
 
 public class InterfazGrafica extends JFrame implements GestorHorarios.ValidationListener {
 
@@ -35,6 +39,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
     private final GestorHorarios gestor = GestorHorarios.getInstance();
     private ConfiguracionProyecto configuracionProyecto = new ConfiguracionProyecto();
+    private final ControladorPersistencia persistenciaController = new ControladorPersistencia();
     
 
     public InterfazGrafica() {
@@ -53,8 +58,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
         if (catalogo.getTodosLosGrupos().isEmpty()) {
             mostrarPlaceholderCrearHorario();
         } else {
-            sincronizarCatalogoConGestor();
-            cargarPestanasDeGrupos();
+            recargarDesdeCatalogo();
         }
     }
 
@@ -112,7 +116,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
         }
 
 
-        agregarPestanaGrado("Vista General " + gradoSeleccionado + "° Grado", gruposDelGrado);
+        agregarPestanaGrado("Vista General " + gradoSeleccionado + " Grado", gruposDelGrado);
         
   
         gruposDelGrado.forEach(this::agregarPestanaHorario);
@@ -155,10 +159,10 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
             return;
         }
         
-        lblEstado.setText("Estado: Generando horario para " + grado + "° Grado...");
+        lblEstado.setText("Estado: Generando horario para " + grado + "Grado...");
 
         // Mostrar un diálogo de "cargando" para bloquear la UI
-        JDialog dlgCargando = crearDialogoCargando("Generando para " + grado + "° Grado...");
+        JDialog dlgCargando = crearDialogoCargando("Generando para " + grado + "Grado...");
         
         SwingWorker<HorarioSemana, Void> worker = new SwingWorker<>() {
             @Override
@@ -177,7 +181,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
             @Override
             protected void done() {
                 try {
-                    dlgCargando.setVisible(false); // Ocultar diálogo al iniciar procesamiento
+                    dlgCargando.setVisible(false); // Ocultar diálgoo al iniciar procesamiento
                     HorarioSemana horarioGenerado = get();
                     lblEstado.setText("Estado: Generación completada. Iniciando animación...");
 
@@ -251,35 +255,113 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
     }
 
     private void onExportar() {
-        JOptionPane.showMessageDialog(this,
-                "Funcionalidad de exportación en desarrollo.",
-                "Exportar", JOptionPane.INFORMATION_MESSAGE);
-    }
+        Component vistaActual = tabbedPanelHorarios.getSelectedComponent();
+        if (vistaActual == null) {
+            JOptionPane.showMessageDialog(this, "No hay una vista de horario seleccionada para exportar.", "Exportar", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
+        // Exportar una vista consolidada de grado en archivos separados por grupo
+        if (vistaActual instanceof PanelHorarioGrado panelGrado) {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("Selecciona carpeta destino para los PNG de cada grupo");
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            chooser.setAcceptAllFileFilterUsed(false);
+
+            if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
+
+            File directorio = chooser.getSelectedFile();
+            int exportados = 0;
+            List<GrupoEstudiantes> grupos = panelGrado.getGrupos();
+            for (GrupoEstudiantes grupo : grupos) {
+                PanelHorario panelTmp = new PanelHorario(grupo.getId());
+                String nombre = (grupo.getNombre() != null ? grupo.getNombre() : "grupo") + ".png";
+                File archivoGrupo = new File(directorio, nombre);
+                try {
+                    exportarComponenteComoPNG(panelTmp, archivoGrupo);
+                    exportados++;
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this,
+                            "Error al exportar el grupo " + grupo.getNombre() + ": " + e.getMessage(),
+                            "Error de Exportación", JOptionPane.ERROR_MESSAGE);
+                } finally {
+                    panelTmp.dispose();
+                }
+            }
+
+            if (exportados > 0) {
+                JOptionPane.showMessageDialog(this,
+                        "Exportados " + exportados + " grupos en:\n" + directorio.getAbsolutePath(),
+                        "Exportación Completa", JOptionPane.INFORMATION_MESSAGE);
+            }
+            return;
+        }
+
+        // Exportar la pestaña actual (grupo individual)
+        Component panelAExportar = vistaActual;
+        if (panelAExportar instanceof JScrollPane) {
+            JViewport viewport = ((JScrollPane) panelAExportar).getViewport();
+            if (viewport != null && viewport.getView() != null) {
+                panelAExportar = viewport.getView();
+            }
+        }
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Exportar horario como PNG");
+        chooser.setFileFilter(new FileNameExtensionFilter("Imagen PNG", "png"));
+
+        int resultado = chooser.showSaveDialog(this);
+        if (resultado == JFileChooser.APPROVE_OPTION) {
+            File archivo = chooser.getSelectedFile();
+            if (!archivo.getName().toLowerCase().endsWith(".png")) {
+                archivo = new File(archivo.getParentFile(), archivo.getName() + ".png");
+            }
+
+            try {
+                exportarComponenteComoPNG(panelAExportar, archivo);
+                JOptionPane.showMessageDialog(this, "Horario exportado exitosamente a:\n" + archivo.getAbsolutePath(), "Exportación Completa", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Ocurrió un error al guardar la imagen:\n" + e.getMessage(), "Error de Exportación", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+        private void exportarComponenteComoPNG(Component component, File archivo) throws IOException {
+        Dimension size = component.getSize();
+        if (size.width <= 0 || size.height <= 0) {
+            size = component.getPreferredSize();
+            component.setSize(size);
+            component.doLayout();
+        }
+        BufferedImage imagen = new BufferedImage(component.getWidth(), component.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = imagen.createGraphics();
+        component.printAll(g2d);
+        g2d.dispose();
+        ImageIO.write(imagen, "png", archivo);
+    }
 
     private void onReiniciarHorario() {
         int confirm = JOptionPane.showConfirmDialog(this,
-                "¿Estás seguro de que deseas reiniciar todos los horarios?\n" +
-                "Todos los bloques volverán a la sección 'sin asignar'.",
+                "\u00bfEst\u00e1s seguro de que deseas reiniciar todos los horarios?\n" +
+                "Todos los bloques volver\u00e1n a la secci\u00f3n 'sin asignar'.",
                 "Confirmar Reinicio",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE);
 
         if (confirm == JOptionPane.YES_OPTION) {
             gestor.limpiarTodo();
-            
             catalogo.getTodosLosGrupos().forEach(grupo -> {
                 catalogo.getAsignacionesPorGrupo(grupo.getId())
                     .forEach(catalogo::reconstruirBloquesDeAsignacion);
             });
-            
-            sincronizarCatalogoConGestor();
-            
+            recargarDesdeCatalogo();
             lblEstado.setText("Estado: Horarios reiniciados. Todos los bloques sin asignar.");
         }
     }
-
-    private void mostrarPlaceholderCrearHorario() {
+private void mostrarPlaceholderCrearHorario() {
         tabbedPanelHorarios.removeAll();
         JPanel panel = new JPanel();
         panel.setBackground(Color.WHITE);
@@ -348,7 +430,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
                         "Sin grupos", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            if (aplicarConfiguracionProyecto(nuevaConfig)) {
+            if (aplicarConfiguracionProyecto(nuevaConfig, true)) {
                 dialog.dispose();
             }
         });
@@ -358,18 +440,33 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
         dialog.setVisible(true);
     }
 
-    private boolean aplicarConfiguracionProyecto(ConfiguracionProyecto nuevaConfig) {
-        configuracionProyecto = nuevaConfig;
+    public boolean aplicarConfiguracionProyecto(ConfiguracionProyecto nuevaConfig, boolean limpiarExistente) {
+        establecerConfiguracionProyecto(nuevaConfig);
 
-        gestor.limpiarTodo();
-        catalogo.getAsignaciones().forEach(asignacion -> catalogo.removeAsignacion(asignacion.getId()));
-        catalogo.getTodosLosGrupos().forEach(grupo -> catalogo.removeGrupo(grupo.getId()));
-        catalogo.getTodosLosBloques().forEach(bloque -> catalogo.removeBloqueHorario(bloque.getId()));
-
-        crearGruposIniciales(nuevaConfig);
-        actualizarTituloProyecto();
-        refrescarDatosYBloquesExistentes();
+        if (limpiarExistente) {
+            gestor.limpiarTodo();
+            catalogo.getAsignaciones().forEach(asignacion -> catalogo.removeAsignacion(asignacion.getId()));
+            catalogo.getTodosLosGrupos().forEach(grupo -> catalogo.removeGrupo(grupo.getId()));
+            catalogo.getTodosLosBloques().forEach(bloque -> catalogo.removeBloqueHorario(bloque.getId()));
+        }
+        
+        crearGruposIniciales(configuracionProyecto);
+        recargarDesdeCatalogo();
         return true;
+    }
+
+    public void establecerConfiguracionProyecto(ConfiguracionProyecto nuevaConfig) {
+        if (nuevaConfig == null) {
+            configuracionProyecto = new ConfiguracionProyecto();
+        } else {
+            configuracionProyecto = nuevaConfig;
+        }
+        actualizarTituloProyecto();
+    }
+
+    public void recargarDesdeCatalogo() {
+        sincronizarCatalogoConGestor();
+        refrescarDatosYBloquesExistentes();
     }
 
     private void crearGruposIniciales(ConfiguracionProyecto config) {
@@ -417,8 +514,7 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
         
-        sincronizarCatalogoConGestor();
-        refrescarDatosYBloquesExistentes();
+        recargarDesdeCatalogo();
     }
 
     private void refrescarDatosYBloquesExistentes() {
@@ -480,19 +576,20 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
 
         JMenuItem itemNuevo = new JMenuItem("Nuevo proyecto");
         JMenuItem itemAbrir = new JMenuItem("Abrir");
-        JMenuItem itemGuardar = new JMenuItem("Guardar");
-        JMenuItem itemExportar = new JMenuItem("Exportar");
+        JMenuItem itemGuardar = new JMenuItem("Guardar como...");
+        JMenuItem itemExportarPNG = new JMenuItem("Exportar a PNG");
         JMenuItem itemSalir = new JMenuItem("Salir");
 
         itemNuevo.addActionListener(e -> mostrarDialogoNuevoProyecto());
-        itemExportar.addActionListener(e -> onExportar());
+        itemAbrir.addActionListener(e -> onAbrirProyecto());
+        itemGuardar.addActionListener(e -> onGuardarProyecto());
+        itemExportarPNG.addActionListener(e -> onExportar());
         itemSalir.addActionListener(e -> System.exit(0));
 
         menuArchivo.add(itemNuevo);
         menuArchivo.add(itemAbrir);
-        menuArchivo.addSeparator();
         menuArchivo.add(itemGuardar);
-        menuArchivo.add(itemExportar);
+        menuArchivo.add(itemExportarPNG);
         menuArchivo.addSeparator();
         menuArchivo.add(itemSalir);
 
@@ -503,6 +600,55 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
         menuBar.add(Box.createHorizontalGlue());
 
         return menuBar;
+    }
+
+    private void onGuardarProyecto() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Guardar proyecto");
+        chooser.setFileFilter(new FileNameExtensionFilter("Archivo de proyecto JSON", "json"));
+
+        if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File archivo = chooser.getSelectedFile();
+            if (!archivo.getName().toLowerCase().endsWith(".json")) {
+                archivo = new File(archivo.getParentFile(), archivo.getName() + ".json");
+            }
+
+            ProyectoDatos datos = new ProyectoDatos(configuracionProyecto, catalogo);
+            try {
+                persistenciaController.guardarProyecto(datos, archivo.getAbsolutePath());
+                lblEstado.setText("Estado: Proyecto guardado correctamente.");
+                JOptionPane.showMessageDialog(this, "Proyecto guardado exitosamente.", "Guardado", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error al guardar el proyecto: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void onAbrirProyecto() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Abrir proyecto");
+        chooser.setFileFilter(new FileNameExtensionFilter("Archivo de proyecto JSON", "json"));
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File archivo = chooser.getSelectedFile();
+            try {
+                ProyectoDatos datosCargados = persistenciaController.cargarProyecto(archivo.getAbsolutePath());
+                
+                // Limpiar estado actual
+                gestor.limpiarTodo();
+                catalogo.reset();
+
+                // Restaurar estado desde los datos cargados
+                datosCargados.restaurarEn(this, catalogo);
+                lblEstado.setText("Estado: Proyecto cargado correctamente.");
+
+                JOptionPane.showMessageDialog(this, "Proyecto cargado exitosamente.", "Cargado", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Error al abrir el proyecto: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
     }
 
     private JPanel crearPanelSuperior() {

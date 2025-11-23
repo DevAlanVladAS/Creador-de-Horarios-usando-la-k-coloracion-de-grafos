@@ -11,4 +11,4 @@ COPY src ./src
 RUN javac $(find src -name "*.java") -d out
 
 # Establecer el classpath y ejecutar la clase principal
-CMD ["java", "-cp", "out", "InterfazGrafica"]
+CMD ["java", "-cp", "out", "Main"]

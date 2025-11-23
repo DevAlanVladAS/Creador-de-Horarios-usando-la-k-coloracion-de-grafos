@@ -20,8 +20,8 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
          * Se invoca cuando la estructura de la semana cambia.
          * @param tipoEvento Tipo de cambio ocurrido
          * @param bloque Bloque involucrado (si aplica)
-         * @param diaOrigen Día de origen (para movimientos)
-         * @param diaDestino Día de destino (para movimientos/asignaciones)
+         * @param diaOrigen DÃƒÆ’Ã‚Â­a de origen (para movimientos)
+         * @param diaDestino DÃƒÆ’Ã‚Â­a de destino (para movimientos/asignaciones)
          */
         void onEstructuraCambiada(EventoSemana tipoEvento, BloqueHorario bloque, 
                                  String diaOrigen, String diaDestino);
@@ -31,13 +31,13 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
      * Tipos de eventos estructurales en la semana.
      */
     public enum EventoSemana {
-        BLOQUE_ASIGNADO,        // Bloque movido de "sin asignar" a un día
+        BLOQUE_ASIGNADO,        // Bloque movido de "sin asignar" a un dí­a
         BLOQUE_DESASIGNADO,     // Bloque movido de un día a "sin asignar"
-        BLOQUE_MOVIDO,          // Bloque movido entre días
+        BLOQUE_MOVIDO,          // Bloque movido entre di­as
         BLOQUE_AGREGADO,        // Nuevo bloque agregado al sistema
         BLOQUE_ELIMINADO,       // Bloque eliminado del sistema
-        DIA_AGREGADO,           // Nuevo día agregado
-        DIA_ELIMINADO           // Día eliminado
+        DIA_AGREGADO,           // Nuevo dí­a agregado
+        DIA_ELIMINADO           // Dí­a eliminado
     }
 
     private List<HorarioSemanaChangeListener> getListeners() {
@@ -57,8 +57,7 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         getListeners().remove(listener);
     }
 
-    private void notifyChange(EventoSemana evento, BloqueHorario bloque, 
-                             String diaOrigen, String diaDestino) {
+    private void notifyChange(EventoSemana evento, BloqueHorario bloque, String diaOrigen, String diaDestino) {
         List<HorarioSemanaChangeListener> listenersCopy = new ArrayList<>(getListeners());
         
         for (HorarioSemanaChangeListener listener : listenersCopy) {

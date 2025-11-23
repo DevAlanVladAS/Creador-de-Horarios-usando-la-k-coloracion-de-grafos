@@ -28,7 +28,7 @@ public class BloqueHorario implements HorarioComponente, java.io.Serializable {
     private String dia; // asignado por HorarioDia o por el asignador
 
     // Identificador único del bloque para el grafo, serialización, etc.
-    private final String id = UUID.randomUUID().toString();
+    private final String id;
 
     // IDs de recursos para integrarse con la UI
     private String profesorId;
@@ -81,38 +81,41 @@ public class BloqueHorario implements HorarioComponente, java.io.Serializable {
         }
     }
 
-
     /**
-     * Constructor con nombres 
+     * Constructor con nombres
      */
     public BloqueHorario(LocalTime horaInicio, LocalTime horaFin, String materia,
                          String profesor, String salon, String grupo) {
+        this(null, horaInicio, horaFin, materia, profesor, salon, grupo, null, null, null);
+    }
 
+    public BloqueHorario(String id, LocalTime horaInicio, LocalTime horaFin, String materia,
+                         String profesor, String salon, String grupo) {
+        this(id, horaInicio, horaFin, materia, profesor, salon, grupo, null, null, null);
+    }
+
+    public BloqueHorario(LocalTime horaInicio, LocalTime horaFin, String materia,
+                         String profesorId, String salonId, String grupoId, boolean ids) {
+        this(null, horaInicio, horaFin, materia, null, null, null, profesorId, salonId, grupoId);
+    }
+
+    public BloqueHorario(String id, LocalTime horaInicio, LocalTime horaFin, String materia,
+                         String profesorId, String salonId, String grupoId, boolean ids) {
+        this(id, horaInicio, horaFin, materia, null, null, null, profesorId, salonId, grupoId);
+    }
+
+    private BloqueHorario(String id, LocalTime horaInicio, LocalTime horaFin, String materia, String profesor, String salon, String grupo, String profesorId, String salonId, String grupoId) {
+
+        this.id = (id == null || id.isBlank()) ? UUID.randomUUID().toString() : id.trim();
         this.horaInicio = horaInicio;
         this.horaFin = horaFin;
         this.materia = materia;
         this.profesor = profesor;
         this.salon = salon;
         this.grupo = grupo;
-
-        this.dia = null;
-    }
-
-    public BloqueHorario(LocalTime horaInicio, LocalTime horaFin, String materia,
-                         String profesorId, String salonId, String grupoId, boolean ids) {
-
-        this.horaInicio = horaInicio;
-        this.horaFin = horaFin;
-        this.materia = materia;
-
-        this.profesor = null;
-        this.salon = null;
-        this.grupo = null;
-
         this.profesorId = profesorId;
         this.salonId = salonId;
         this.grupoId = grupoId;
-
         this.dia = null;
     }
 
