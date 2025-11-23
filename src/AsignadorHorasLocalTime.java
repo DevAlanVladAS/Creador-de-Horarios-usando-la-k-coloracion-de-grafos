@@ -168,6 +168,12 @@ public class AsignadorHorasLocalTime {
 
         // 4. Validadores
         boolean valido = true;
+
+        // Regla: no más de 2 horas seguidas de la misma materia en el día
+        if (excedeMaximoConsecutivoMateria(bloque, asignados)) {
+            valido = false;
+        }
+
         for (BloqueHorario other : asignados) {
             if (other == bloque) continue;
             
@@ -194,6 +200,62 @@ public class AsignadorHorasLocalTime {
         }
 
         return false;
+    }
+
+    /**
+     * Verifica si al colocar este bloque se exceden 2 horas consecutivas de la misma materia en el día.
+     */
+    private boolean excedeMaximoConsecutivoMateria(BloqueHorario bloque, List<BloqueHorario> asignados) {
+        if (bloque.getMateria() == null || bloque.getHoraInicio() == null || bloque.getHoraFin() == null) {
+            return false;
+        }
+
+        // Reunir todos los intervalos de la misma materia (incluyendo el bloque actual)
+        List<BloqueHorario> mismos = new ArrayList<>();
+        mismos.add(bloque);
+        for (BloqueHorario b : asignados) {
+            if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                    && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                mismos.add(b);
+            }
+        }
+
+        if (mismos.isEmpty()) return false;
+
+        // Ordenar por inicio y encontrar cadenas consecutivas
+        mismos.sort(Comparator.comparing(BloqueHorario::getHoraInicio));
+        LocalTime cadenaInicio = mismos.get(0).getHoraInicio();
+        LocalTime cadenaFin = mismos.get(0).getHoraFin();
+
+        for (int i = 1; i < mismos.size(); i++) {
+            BloqueHorario actual = mismos.get(i);
+            if (actual.getHoraInicio().equals(cadenaFin)) {
+                // continuidad exacta
+                cadenaFin = actual.getHoraFin();
+            } else if (actual.getHoraInicio().isBefore(cadenaFin)) {
+                // solape — ya sería conflicto por validador de hora
+                cadenaFin = max(cadenaFin, actual.getHoraFin());
+            } else {
+                // nueva cadena
+                cadenaInicio = actual.getHoraInicio();
+                cadenaFin = actual.getHoraFin();
+            }
+
+            if (Duration.between(cadenaInicio, cadenaFin).toMinutes() > 120) {
+                return true;
+            }
+        }
+
+        // También evaluar la primera cadena sola
+        if (Duration.between(mismos.get(0).getHoraInicio(), mismos.get(0).getHoraFin()).toMinutes() > 120) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private LocalTime max(LocalTime a, LocalTime b) {
+        return a.isAfter(b) ? a : b;
     }
 
     /**

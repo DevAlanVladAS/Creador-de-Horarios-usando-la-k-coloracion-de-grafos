@@ -78,20 +78,27 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
             
             
             HorarioSemana semana = gestor.getHorarioSemana(grupoId);
-            
-            
-            List<BloqueHorario> bloquesExistentes = new ArrayList<>(semana.getBloques());
-            for (BloqueHorario bloqueExistente : bloquesExistentes) {
-                semana.eliminarBloque(bloqueExistente.getId());
-            }
-            
-           
+            // --- Sincronización no destructiva para preservar posiciones manuales ---
+            // 1) Agregar los bloques nuevos que estén en catálogo y no en el gestor.
+            var existentes = new ArrayList<>(semana.getBloques());
+            var idsExistentes = existentes.stream().map(BloqueHorario::getId).collect(Collectors.toSet());
             for (BloqueHorario bloque : bloquesDelGrupo) {
-                gestor.agregarBloque(bloque, grupoId);
-                
-                
+                if (!idsExistentes.contains(bloque.getId())) {
+                    gestor.agregarBloque(bloque, grupoId);
+                }
+                // Reaplicar la posición almacenada (si la hay) sin borrar otras posiciones.
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
                     gestor.actualizarPosicionBloque(bloque, bloque.getDia(), bloque.getHoraInicio());
+                } else if (bloque.getDia() == null) {
+                    semana.agregarBloqueSinAsignar(bloque);
+                }
+            }
+
+            // 2) Remover bloques que ya no existan en catálogo.
+            var idsCatalogo = bloquesDelGrupo.stream().map(BloqueHorario::getId).collect(Collectors.toSet());
+            for (BloqueHorario bloqueExistente : existentes) {
+                if (!idsCatalogo.contains(bloqueExistente.getId())) {
+                    semana.eliminarBloque(bloqueExistente.getId());
                 }
             }
         }
