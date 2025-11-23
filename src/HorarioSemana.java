@@ -132,7 +132,7 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         // --- PASO 1: Limpieza exhaustiva de la posición anterior del bloque ---
         // Se elimina de la lista de "sin asignar" y de CUALQUIER día en el que pudiera estar.
         // Esto crea un "estado limpio" y previene duplicados incluso si 'asignaciones' está desincronizado.
-        bloquesSinAsignar.remove(bloque);
+        bloquesSinAsignar.removeIf(b -> b.getId().equals(bloque.getId()));
         for (HorarioDia dia : diasSemana) {
             dia.eliminar(bloque); // Intenta eliminar el bloque de cada día.
         }
@@ -167,20 +167,13 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
 
     public void agregarBloqueSinAsignar(BloqueHorario bloque) {
         String diaAnterior = asignaciones.remove(bloque.getId());
-        
-
-        if (diaAnterior != null) {
-            for (HorarioDia hd : diasSemana) {
-                if (hd.getDia().equalsIgnoreCase(diaAnterior)) {
-                    hd.eliminar(bloque);
-                    break;
-                }
-            }
+        // Limpia el bloque de cualquier día en el que pudiera estar para evitar duplicados.
+        for (HorarioDia hd : diasSemana) {
+            hd.eliminar(bloque);
         }
         
-        if (!bloquesSinAsignar.contains(bloque)) {
-            bloquesSinAsignar.add(bloque);
-        }
+        bloquesSinAsignar.removeIf(b -> b.getId().equals(bloque.getId()));
+        bloquesSinAsignar.add(bloque);
         
         bloque.setDia(null);
         

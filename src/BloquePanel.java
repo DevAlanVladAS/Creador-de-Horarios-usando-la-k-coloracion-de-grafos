@@ -13,6 +13,7 @@ import java.awt.dnd.DragSourceEvent;
 import java.awt.dnd.DragSourceListener;
 import java.util.HashMap;
 import java.util.Map;
+import java.awt.Cursor;
 
 public class BloquePanel extends JPanel implements Transferable, DragGestureListener, DragSourceListener {
 
@@ -48,10 +49,12 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         setOpaque(false);
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        setCursor(new Cursor(Cursor.HAND_CURSOR));
 
         CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
         Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
         Salon salon = catalogo.obtenerSalonPorId(bloque.getSalonId());
+        GrupoEstudiantes grupo = catalogo.obtenerGrupoPorId(bloque.getGrupoId());
 
         JLabel materiaLabel = new JLabel(bloque.getMateria() != null ? bloque.getMateria() : "Materia");
         materiaLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -62,6 +65,11 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         profesorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         profesorLabel.setForeground(Color.WHITE);
 
+        JLabel grupoLabel = new JLabel(
+                grupo != null ? "Grupo " + grupo.getNombre() : "");
+        grupoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        grupoLabel.setForeground(Color.WHITE);
+
         JLabel salonLabel = new JLabel(
                 salon != null ? salon.getNombre() : "");
         salonLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
@@ -70,6 +78,9 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         add(materiaLabel);
         add(Box.createVerticalStrut(2));
         add(profesorLabel);
+        if (!grupoLabel.getText().isEmpty()) {
+            add(grupoLabel);
+        }
         if (!salonLabel.getText().isEmpty()) {
             add(salonLabel);
         }
