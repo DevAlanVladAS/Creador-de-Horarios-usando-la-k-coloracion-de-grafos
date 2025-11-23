@@ -52,11 +52,11 @@ public class ControladorPersistencia {
      */
     public HorarioSemana cargarHorario(String ruta) {
         if (ruta == null || ruta.isBlank()) {
-            throw new IllegalArgumentException("Debe proporcionar una ruta v\u00e1lida");
+            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
         }
         Path origen = Paths.get(ruta);
         if (!Files.exists(origen)) {
-            throw new IllegalArgumentException("No se encontr\u00f3 el archivo: " + ruta);
+            throw new IllegalArgumentException("No se encontró el archivo: " + ruta);
         }
         try {
             String data = Files.readString(origen, StandardCharsets.UTF_8);
@@ -64,6 +64,33 @@ public class ControladorPersistencia {
         } catch (IOException e) {
             throw new RuntimeException("No se pudo leer el archivo " + ruta, e);
         }
+    }
+
+    public void guardarProyecto(ProyectoDatos datos, String ruta) throws IOException {
+        if (datos == null) {
+            throw new IllegalArgumentException("No hay datos de proyecto para guardar");
+        }
+        if (ruta == null || ruta.isBlank()) {
+            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
+        }
+        Path destino = Paths.get(ruta);
+        Path parent = destino.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Files.writeString(destino, datos.toJson(), StandardCharsets.UTF_8);
+    }
+
+    public ProyectoDatos cargarProyecto(String ruta) throws IOException {
+        if (ruta == null || ruta.isBlank()) {
+            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
+        }
+        Path origen = Paths.get(ruta);
+        if (!Files.exists(origen)) {
+            throw new IllegalArgumentException("No se encontró el archivo: " + ruta);
+        }
+        String contenido = Files.readString(origen, StandardCharsets.UTF_8);
+        return ProyectoDatos.fromJson(contenido);
     }
 
     private String serializarHorario(HorarioSemana horario) {

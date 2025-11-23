@@ -67,7 +67,7 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
             }
         }
 
-        // Fila 2: Sub-cabeceras de Días
+        // Fila 2: Sub-cabeceras de DÃƒÂ­as
         gridPanel.add(new JLabel("")); // Columna de horas
         for (GrupoEstudiantes grupo : this.grupos) {
             for(String dia : DIAS_SEMANA) {
@@ -111,7 +111,11 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
         refrescarVista();
     }
 
-    // ========== IMPLEMENTACIÓN DEL OBSERVER ==========
+    public List<GrupoEstudiantes> getGrupos() {
+        return new ArrayList<>(grupos);
+    }
+
+    // ========== IMPLEMENTACIÃƒâ€œN DEL OBSERVER ==========
 
     /**
      * Callback del Observer: se invoca cuando cambian los bloques.
@@ -197,7 +201,7 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
             for (BloqueHorario bloque : bloquesGrupo) {
                 gestor.agregarBloque(bloque, grupoId);
                 
-                // Si el bloque ya tiene posición, asignarlo
+                // Si el bloque ya tiene posiciÃƒÂ³n, asignarlo
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
                     gestor.actualizarPosicionBloque(bloque, 
                         bloque.getDia(), 
@@ -206,7 +210,7 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
             }
         }
         
-        // El refresco se hará automáticamente vía Observer
+        // El refresco se hará automáticamente ví­a Observer
     }
 
     /**
@@ -309,7 +313,7 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
                         JOptionPane.showMessageDialog(PanelHorarioGrado.this,
                             "Este bloque pertenece al grupo " + bloqueTransferido.getGrupoId() + 
                             " y no puede ser colocado en el grupo " + celda.getGrupoId(),
-                            "Error de asignación",
+                            "Error de asignaciÃƒÂ³n",
                             JOptionPane.ERROR_MESSAGE);
                         return;
                     }

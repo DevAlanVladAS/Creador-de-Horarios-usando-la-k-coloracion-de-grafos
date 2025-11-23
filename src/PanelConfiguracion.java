@@ -427,6 +427,10 @@ public class PanelConfiguracion extends JPanel implements GestorHorarios.Horario
         cmbSalonAsignacion = new JComboBox<>();
         spHorasAsignacion = new JSpinner(new SpinnerNumberModel(1, 1, 6, 1));
 
+        // Listeners para sincronizar materia al cambiar profesor
+        cmbProfesorAsignacion.addActionListener(e -> actualizarMateriaPorProfesor());
+        chkMateriaLibre.addActionListener(e -> actualizarMateriaPorProfesor());
+
         gbc.gridx = 0; gbc.gridy = 0; formulario.add(new JLabel("Grupo:"), gbc);
         gbc.gridx = 1; formulario.add(cmbGrupoAsignacion, gbc);
         gbc.gridx = 0; gbc.gridy = 1; formulario.add(new JLabel("Profesor:"), gbc);

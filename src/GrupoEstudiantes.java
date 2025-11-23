@@ -11,9 +11,16 @@ public class GrupoEstudiantes {
     private final List<String> profesorIds = new ArrayList<>();
 
     public GrupoEstudiantes(String nombre, int grado) {
-        this.id = UUID.randomUUID().toString();
+        this(null, nombre, grado, null);
+    }
+    
+    public GrupoEstudiantes(String id, String nombre, int grado, List<String> profesores) {
+        this.id = (id == null || id.isBlank()) ? UUID.randomUUID().toString() : id.trim();
         this.nombre = nombre;
         this.grado = grado;
+        if (profesores != null) {
+            this.profesorIds.addAll(profesores);
+        }
     }
     
     public String getId() { return id; }

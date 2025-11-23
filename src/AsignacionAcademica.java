@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 public class AsignacionAcademica implements Serializable {
 
-    private final String id = UUID.randomUUID().toString();
+    private final String id;
     private final String grupoId;
     private final String profesorId;
     private final String materiaId;
@@ -21,15 +21,16 @@ public class AsignacionAcademica implements Serializable {
     private int horasSemanales;
     private final List<String> bloqueIds = new ArrayList<>();
 
-    public AsignacionAcademica(String grupoId,
-                               String profesorId,
-                               String materiaId,
-                               String salonId,
-                               int horasSemanales) {
+    public AsignacionAcademica(String grupoId, String profesorId, String materiaId, String salonId, int horasSemanales) {
+        this(null, grupoId, profesorId, materiaId, salonId, horasSemanales);
+    }
+
+    public AsignacionAcademica(String id, String grupoId, String profesorId, String materiaId, String salonId, int horasSemanales) {
 
         if (grupoId == null || profesorId == null || materiaId == null) {
             throw new IllegalArgumentException("Grupo, profesor y materia son obligatorios");
         }
+        this.id = (id == null || id.isBlank()) ? UUID.randomUUID().toString() : id.trim();
         this.grupoId = grupoId;
         this.profesorId = profesorId;
         this.materiaId = materiaId;
@@ -112,7 +113,7 @@ public class AsignacionAcademica implements Serializable {
         for (int i = 0; i < horasSemanales && bloquesGenerados < horasSemanales; i++) {
             LocalTime slot = horasDispoLocales.get(i % horasDispoLocales.size());
             int repeticion = i / horasDispoLocales.size();
-            LocalTime inicio = slot.plusMinutes(repeticion * 5L);
+            LocalTime inicio = slot.plus(bloqueDuracion.multipliedBy(repeticion));
             LocalTime fin = inicio.plus(bloqueDuracion);
 
             BloqueHorario bloque = new BloqueHorario(
@@ -131,9 +132,7 @@ public class AsignacionAcademica implements Serializable {
         return bloques;
     }
 
-    public List<BloqueHorario> construirBloques(String materiaNombre,
-                                                List<LocalTime> horasBase,
-                                                Duration duracion) {
+    public List<BloqueHorario> construirBloques(String materiaNombre, List<LocalTime> horasBase, Duration duracion) {
 
         List<BloqueHorario> bloques = new ArrayList<>();
         if (materiaNombre == null || materiaNombre.isBlank()) {
@@ -151,7 +150,7 @@ public class AsignacionAcademica implements Serializable {
         for (int i = 0; i < horasSemanales; i++) {
             LocalTime slot = base.get(i % base.size());
             int repeticion = i / base.size();
-            LocalTime inicio = slot.plusMinutes(repeticion * 5L);
+            LocalTime inicio = slot.plus(bloqueDuracion.multipliedBy(repeticion));
             LocalTime fin = inicio.plus(bloqueDuracion);
 
             BloqueHorario bloque = new BloqueHorario(

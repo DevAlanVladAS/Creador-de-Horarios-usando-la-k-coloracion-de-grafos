@@ -167,10 +167,18 @@ public class CatalogoRecursos {
         return new ArrayList<>(asignaciones.values());
     }
 
+    public Map<String, List<String>> getMapaAsignacionBloques() {
+        return asignacionABloques.entrySet().stream()
+                .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    e -> new ArrayList<>(e.getValue())
+                ));
+    }
+
     public List<AsignacionAcademica> getAsignacionesPorGrupo(String grupoId) {
         return asignaciones.values().stream()
-                .filter(a -> grupoId != null && grupoId.equals(a.getGrupoId()))
-                .collect(Collectors.toList());
+            .filter(a -> grupoId != null && grupoId.equals(a.getGrupoId()))
+            .collect(Collectors.toList());
     }
 
     // --- BLOQUES ---
@@ -184,15 +192,15 @@ public class CatalogoRecursos {
     
     public List<BloqueHorario> getBloquesByGrupoId(String grupoId) {
         return bloques.values().stream()
-            .filter(b -> grupoId != null && grupoId.equals(b.getGrupoId()))
-            .collect(Collectors.toList());
+        .filter(b -> grupoId != null && grupoId.equals(b.getGrupoId()))
+        .collect(Collectors.toList());
     }
 
     public List<BloqueHorario> getBloquesByGrupoIds(List<String> grupoIds) {
         if (grupoIds == null || grupoIds.isEmpty()) return new ArrayList<>();
         return bloques.values().stream()
-                .filter(b -> b.getGrupoId() != null && grupoIds.contains(b.getGrupoId()))
-                .collect(Collectors.toList());
+            .filter(b -> b.getGrupoId() != null && grupoIds.contains(b.getGrupoId()))
+            .collect(Collectors.toList());
     }
 
     public List<BloqueHorario> getBloquesByProfesorId(String profesorId) {
@@ -202,7 +210,7 @@ public class CatalogoRecursos {
     }
 
     /**
-     * Resetea todos los datos del catálogo e inserta nuevamente las materias base.
+     * Resetea todos los datos del catÃƒÂ¡logo e inserta nuevamente las materias base.
      */
     public void reset() {
         profesores.clear();
@@ -215,58 +223,90 @@ public class CatalogoRecursos {
         inicializarMateriasBase();
     }
 
+    /**
+     * Restaura el estado del catálogo desde listas de datos.
+     * Usado al cargar un proyecto desde JSON.
+     */
+    public void restaurarDesdeDatos(List<Profesor> profesoresDatos,List<Salon> salonesDatos, List<GrupoEstudiantes> gruposDatos, List<Materia> materiasDatos, List<AsignacionAcademica> asignacionesDatos, List<BloqueHorario> bloquesDatos, Map<String, List<String>> asignacionBloquesDatos) {
+
+        profesores.clear();
+        salones.clear();
+        grupos.clear();
+        bloques.clear();
+        asignaciones.clear();
+        asignacionABloques.clear();
+        materias.clear();
+
+        if (profesoresDatos != null) {
+            profesoresDatos.forEach(profesor -> profesores.put(profesor.getId(), profesor));
+        }
+        if (salonesDatos != null) {
+            salonesDatos.forEach(salon -> salones.put(salon.getId(), salon));
+        }
+        if (gruposDatos != null) {
+            gruposDatos.forEach(grupo -> grupos.put(grupo.getId(), grupo));
+        }
+
+        if (materiasDatos != null && !materiasDatos.isEmpty()) {
+            materiasDatos.forEach(materia -> materias.put(materia.getId(), materia));
+        } else {
+            inicializarMateriasBase();
+        }
+
+        if (asignacionesDatos != null) {
+            asignacionesDatos.forEach(asignacion -> asignaciones.put(asignacion.getId(), asignacion));
+        }
+
+        if (bloquesDatos != null) {
+            bloquesDatos.forEach(bloque -> bloques.put(bloque.getId(), bloque));
+        }
+
+        if (asignacionBloquesDatos != null) {
+            asignacionBloquesDatos.forEach((clave, lista) ->
+                asignacionABloques.put(clave, new ArrayList<>(lista)));
+        } else if (asignacionesDatos != null) {
+            asignacionesDatos.forEach(asignacion ->
+                asignacionABloques.put(asignacion.getId(), new ArrayList<>(asignacion.getBloqueIds())));
+        }
+    }
+
     public Optional<Profesor> findProfesorByName(String nombre) {
-        return profesores.values().stream()
-                .filter(p -> p.getNombre().equalsIgnoreCase(nombre))
-                .findFirst();
+        return profesores.values().stream().filter(p -> p.getNombre().equalsIgnoreCase(nombre)).findFirst();
     }
 
     public Optional<GrupoEstudiantes> findGrupoByName(String nombre) {
-        return grupos.values().stream()
-                .filter(g -> g.getNombre().equalsIgnoreCase(nombre))
-                .findFirst();
+        return grupos.values().stream().filter(g -> g.getNombre().equalsIgnoreCase(nombre)).findFirst();
     }
 
     public Optional<Salon> findSalonByName(String nombre) {
-        return salones.values().stream()
-                .filter(s -> s.getNombre().equalsIgnoreCase(nombre))
-                .findFirst();
+        return salones.values().stream().filter(s -> s.getNombre().equalsIgnoreCase(nombre)).findFirst();
     }
 
     public void removeBloquesByProfesorId(String id) {
-        List<String> idsARemover = bloques.values().stream()
-            .filter(b -> id != null && id.equals(b.getProfesorId()))
-            .map(BloqueHorario::getId)
-            .collect(Collectors.toList());
+        List<String> idsARemover = bloques.values().stream().filter(b -> id != null && id.equals(b.getProfesorId())).map(BloqueHorario::getId).collect(Collectors.toList());
         idsARemover.forEach(bloques::remove);
     }
 
     private void eliminarAsignaciones(Predicate<AsignacionAcademica> predicate) {
-        List<String> ids = asignaciones.values().stream()
-                .filter(predicate)
-                .map(AsignacionAcademica::getId)
-                .collect(Collectors.toList());
+        List<String> ids = asignaciones.values().stream().filter(predicate).map(AsignacionAcademica::getId).collect(Collectors.toList());
         ids.forEach(this::removeAsignacion);
     }
 
     public void reconstruirBloquesDeAsignacion(AsignacionAcademica asignacion) {
-        // Primero, eliminar los bloques viejos asociados a esta asignación para evitar duplicados.
+        // Primero, eliminar los bloques viejos asociados a esta asignaciÃƒÂ³n para evitar duplicados.
         removeBloquesPorAsignacion(asignacion.getId());
 
         // Ahora, crear los nuevos bloques desde cero.
         Materia materia = materias.get(asignacion.getMateriaId());
         Profesor profesor = profesores.get(asignacion.getProfesorId());
         if (materia == null) {
-            throw new IllegalStateException("Materia no encontrada para la asignación");
+            throw new IllegalStateException("Materia no encontrada para la asignaciÃƒÂ³n");
         }
         
         // Pasar horas disponibles del profesor si existen
         List<BloqueHorario> nuevosBloques;
         if (profesor != null && profesor.getHorasDisponibles() != null && !profesor.getHorasDisponibles().isEmpty()) {
-            nuevosBloques = asignacion.construirBloquesRespetandoDisponibilidad(
-                    materia.getNombre(), 
-                    profesor.getHorasDisponibles()
-            );
+            nuevosBloques = asignacion.construirBloquesRespetandoDisponibilidad(materia.getNombre(), profesor.getHorasDisponibles());
         } else {
             nuevosBloques = asignacion.construirBloques(materia.getNombre());
         }
