@@ -8,14 +8,19 @@ import java.util.UUID;
  */
 public class Materia implements Serializable {
 
-    private final String id = UUID.randomUUID().toString();
+    private final String id;
     private final String nombre;
     private int horasSugeridas;
 
     public Materia(String nombre, int horasSugeridas) {
+        this(null, nombre, horasSugeridas);
+    }
+
+    public Materia(String id, String nombre, int horasSugeridas) {
         if (nombre == null || nombre.isBlank()) {
             throw new IllegalArgumentException("El nombre de la materia no puede ser vacío");
         }
+        this.id = (id == null || id.isBlank()) ? UUID.randomUUID().toString() : id.trim();
         this.nombre = nombre.trim();
         this.horasSugeridas = Math.max(1, horasSugeridas);
     }

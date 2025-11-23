@@ -10,10 +10,19 @@ public class ValidadorPorSalon implements Validador {
     @Override
     public boolean esValido(BloqueHorario a, BloqueHorario b) {
 
-        if (!a.getSalonId().equals(b.getSalonId()))
-            return true;
+        String salonA = a.getSalonId();
+        String salonB = b.getSalonId();
 
-        boolean mismoDia = a.getDia().equals(b.getDia());
+        // Si alguno no tiene salón asignado, no hay conflicto por salón.
+        if (salonA == null || salonB == null) {
+            return true;
+        }
+
+        if (!salonA.equals(salonB)) {
+            return true;
+        }
+
+        boolean mismoDia = a.getDia() != null && a.getDia().equals(b.getDia());
         boolean traslape =
                 a.getHoraInicio().isBefore(b.getHoraFin()) &&
                 a.getHoraFin().isAfter(b.getHoraInicio());
