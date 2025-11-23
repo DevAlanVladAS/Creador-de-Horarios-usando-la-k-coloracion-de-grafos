@@ -3,7 +3,7 @@ import java.util.*;
 
 public class AsignadorDeDias {
 
-    private final List<Validador> validadores;
+    private final transient List<Validador> validadores;
 
     public AsignadorDeDias(List<Validador> validadores) {
         this.validadores = validadores != null ? validadores : new ArrayList<>();
@@ -29,13 +29,8 @@ public class AsignadorDeDias {
 
             String dia = dias.get(color);
 
-            if (esValidoEnDia(b, dia, semana)) {
-                b.setDia(dia);
-                semana.agregarBloqueEnDia(dia, b);
-            } else {
-                // no pasó validadores de fase 2
-                semana.agregar(b);
-            }
+            b.setDia(dia);
+            semana.agregarBloqueEnDia(dia, b);
         }
 
         return semana;
@@ -48,9 +43,13 @@ public class AsignadorDeDias {
                 .map(HorarioDia::getBloques)
                 .orElse(Collections.emptyList());
         for (BloqueHorario otro : delDia) {
-            for (Validador v : validadores) {
-                if (!v.esValido(b, otro))
-                    return false;
+             for (Validador v : validadores) {
+                List<ResultadoValidacion> resultados = v.validar(b, otro, semana);
+                for (ResultadoValidacion res : resultados) {
+                    if (res.getSeveridad() == ResultadoValidacion.Severidad.ERROR) {
+                        return false; // Conflicto duro encontrado
+                    }
+                }
             }
         }
         return true;

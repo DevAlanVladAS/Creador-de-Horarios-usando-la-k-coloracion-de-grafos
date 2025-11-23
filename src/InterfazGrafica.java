@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-public class InterfazGrafica extends JFrame {
+public class InterfazGrafica extends JFrame implements GestorHorarios.ValidationListener {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -30,6 +30,7 @@ public class InterfazGrafica extends JFrame {
     private static final Color COLOR_ACCION_DORADO = new Color(255, 196, 0);
 
     private JLabel lblEstado;
+    private PanelNotificaciones panelNotificaciones;
 
     private final CatalogoRecursos catalogo = CatalogoRecursos.getInstance();
     private final GestorHorarios gestor = GestorHorarios.getInstance();
@@ -46,12 +47,21 @@ public class InterfazGrafica extends JFrame {
         initComponents();
         actualizarTituloProyecto();
 
+        // Registrarse para escuchar resultados de validación
+        gestor.addValidationListener(this);
+
         if (catalogo.getTodosLosGrupos().isEmpty()) {
             mostrarPlaceholderCrearHorario();
         } else {
             sincronizarCatalogoConGestor();
             cargarPestanasDeGrupos();
         }
+    }
+
+    @Override
+    public void onValidationFinished(List<ResultadoValidacion> resultados) {
+        // Cuando el gestor termina de validar, actualiza el panel de notificaciones.
+        SwingUtilities.invokeLater(() -> panelNotificaciones.mostrarResultados(resultados));
     }
 
     private void sincronizarCatalogoConGestor() {
@@ -541,16 +551,20 @@ public class InterfazGrafica extends JFrame {
     }
 
     private JPanel crearPanelInferior() {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(10, 0));
         panel.setBackground(new Color(230, 235, 242));
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(200, 200, 200)),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)));
 
         lblEstado = new JLabel("Estado: listo");
         lblEstado.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         lblEstado.setForeground(new Color(60, 90, 154));
         panel.add(lblEstado, BorderLayout.WEST);
+
+        panelNotificaciones = new PanelNotificaciones();
+        panel.add(panelNotificaciones, BorderLayout.CENTER);
+        
         return panel;
     }
 

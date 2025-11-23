@@ -7,13 +7,14 @@ import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.DragGestureListener;
 import java.awt.dnd.DragSource;
+import java.awt.dnd.DragSourceDragEvent;
+import java.awt.dnd.DragSourceDropEvent;
+import java.awt.dnd.DragSourceEvent;
+import java.awt.dnd.DragSourceListener;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Representa visualmente un BloqueHorario y puede arrastrarse entre celdas.
- */
-public class BloquePanel extends JPanel implements Transferable, DragGestureListener {
+public class BloquePanel extends JPanel implements Transferable, DragGestureListener, DragSourceListener {
 
     public static final DataFlavor DATA_FLAVOR = new DataFlavor(BloqueHorario.class, "BloqueHorario");
 
@@ -139,7 +140,36 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
 
     @Override
     public void dragGestureRecognized(DragGestureEvent dge) {
-        dge.startDrag(DragSource.DefaultMoveDrop, this);
+        // Iniciar el arrastre y registrar ESTE panel como el listener de la fuente.
+        dge.startDrag(DragSource.DefaultMoveDrop, this, this);
+    }
+
+    // --- Métodos de DragSourceListener ---
+
+    @Override
+    public void dragEnter(DragSourceDragEvent dsde) {}
+
+    @Override
+    public void dragOver(DragSourceDragEvent dsde) {}
+
+    @Override
+    public void dropActionChanged(DragSourceDragEvent dsde) {}
+
+    @Override
+    public void dragExit(DragSourceEvent dse) {}
+
+    @Override
+    public void dragDropEnd(DragSourceDropEvent dsde) {
+        // Este método se llama cuando el drop se completa.
+        // Si el drop fue exitoso, eliminamos el panel original de su contenedor.
+        if (dsde.getDropSuccess()) {
+            Container parent = getParent();
+            if (parent != null) {
+                parent.remove(this);
+                parent.revalidate();
+                parent.repaint();
+            }
+        }
     }
 
     @Override

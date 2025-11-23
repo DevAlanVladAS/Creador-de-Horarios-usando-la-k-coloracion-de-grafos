@@ -20,10 +20,12 @@ public class ControladorValidacion {
      * @return lista de resultados de validación (errores o advertencias).
      */
     public List<ResultadoValidacion> validarTodo(HorarioSemana horario) {
-        System.out.println("Validando horario...");
-        // Aquí se pueden agregar validaciones reales
-        List<ResultadoValidacion> resultados = new ArrayList<>();
-        resultados.add(new ResultadoValidacion("Validación completa: sin errores."));
-        return resultados;
+        System.out.println("Iniciando validación completa del horario...");
+        if (horario == null) {
+            List<ResultadoValidacion> resultados = new ArrayList<>();
+            resultados.add(new ResultadoValidacion("Error: El horario a validar es nulo.", ResultadoValidacion.Severidad.ERROR));
+            return resultados;
+        }
+        return validador.validar(horario);
     }
 }

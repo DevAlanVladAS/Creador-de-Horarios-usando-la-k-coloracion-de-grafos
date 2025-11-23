@@ -71,10 +71,22 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
     }
 
 
+    // Constructor
     public HorarioSemana() {
         this.diasSemana = new ArrayList<>();
         this.bloquesSinAsignar = new ArrayList<>();
         this.asignaciones = new HashMap<>();
+    }
+
+    /**
+     * Inicializa la semana con una lista de días estándar.
+     * Si ya hay días, no hace nada.
+     * @param nombresDias Lista de nombres de los días a crear.
+     */
+    public void inicializarDias(List<String> nombresDias) {
+        if (diasSemana.isEmpty() && nombresDias != null) {
+            nombresDias.forEach(nombre -> agregarDia(new HorarioDia(nombre)));
+        }
     }
 
 
@@ -110,43 +122,48 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
     }
 
 
-    public void agregarBloqueEnDia(String dia, BloqueHorario bloque) {
-        for (HorarioDia horarioDia : diasSemana) {
-            if (horarioDia.getDia().equalsIgnoreCase(dia)) {
-                String diaAnterior = asignaciones.get(bloque.getId());
+    public void agregarBloqueEnDia(String diaDestino, BloqueHorario bloque) {
+        HorarioDia horarioDiaDestino = diasSemana.stream()
+                .filter(d -> d.getDia().equalsIgnoreCase(diaDestino))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Día no encontrado: " + diaDestino));
 
-                // Si el bloque estaba en otro día, lo eliminamos de allí primero.
-                if (diaAnterior != null && !diaAnterior.equalsIgnoreCase(dia)) {
-                    for (HorarioDia hd : diasSemana) {
-                        if (hd.getDia().equalsIgnoreCase(diaAnterior)) {
-                            hd.eliminar(bloque);
-                            break;
-                        }
-                    }
-                }
+        String diaAnterior = asignaciones.get(bloque.getId());
 
-                // Intentamos agregar el bloque al día de destino.
-                boolean agregadoConExito = horarioDia.agregar(bloque);
+        // --- PASO 1: Limpieza exhaustiva de la posición anterior del bloque ---
+        // Se elimina de la lista de "sin asignar" y de CUALQUIER día en el que pudiera estar.
+        // Esto crea un "estado limpio" y previene duplicados incluso si 'asignaciones' está desincronizado.
+        bloquesSinAsignar.remove(bloque);
+        for (HorarioDia dia : diasSemana) {
+            dia.eliminar(bloque); // Intenta eliminar el bloque de cada día.
+        }
 
-                if (agregadoConExito) {
-                    // Si se agregó, lo quitamos de la lista de sin asignar y actualizamos su estado.
-                    bloquesSinAsignar.remove(bloque);
-                    asignaciones.put(bloque.getId(), dia);
-                    
-                    if (diaAnterior == null) {
-                        notifyChange(EventoSemana.BLOQUE_ASIGNADO, bloque, null, dia);
-                    } else {
-                        notifyChange(EventoSemana.BLOQUE_MOVIDO, bloque, diaAnterior, dia);
-                    }
-                } else {
-                    // Si no se pudo agregar (por traslape), lo movemos a la lista de sin asignar.
-                    agregarBloqueSinAsignar(bloque);
-                }
-                
-                return;
+        // --- PASO 2: Intentar agregar el bloque a su nuevo día ---
+        boolean agregadoConExito = horarioDiaDestino.agregar(bloque);
+
+        // --- PASO 3: Actualizar estado y notificar basado en el resultado ---
+        if (agregadoConExito) {
+            // Si tuvo éxito, se actualiza la asignación definitiva.
+            asignaciones.put(bloque.getId(), diaDestino);
+            
+            if (diaAnterior == null) {
+                notifyChange(EventoSemana.BLOQUE_ASIGNADO, bloque, null, diaDestino);
+            } else {
+                notifyChange(EventoSemana.BLOQUE_MOVIDO, bloque, diaAnterior, diaDestino);
+            }
+        } else {
+            // Si falla (ej. por solapamiento), se asegura que el bloque termine en "sin asignar".
+            if (!bloquesSinAsignar.contains(bloque)) {
+                bloquesSinAsignar.add(bloque);
+            }
+            // Se elimina cualquier asignación para evitar un estado inconsistente.
+            asignaciones.remove(bloque.getId());
+
+            // Se notifica que fue desasignado, ya que no se pudo colocar en el destino.
+            if (diaAnterior != null) {
+                notifyChange(EventoSemana.BLOQUE_DESASIGNADO, bloque, diaAnterior, null);
             }
         }
-        throw new IllegalArgumentException("Día no encontrado: " + dia);
     }
 
     public void agregarBloqueSinAsignar(BloqueHorario bloque) {

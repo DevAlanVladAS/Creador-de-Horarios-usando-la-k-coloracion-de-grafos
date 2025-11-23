@@ -1,24 +1,42 @@
 package src;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+
 
 public class ValidadorPorDia implements Validador {
 
-    private List<String> diasPermitidos;
+    private final List<String> diasPermitidos;
 
     public ValidadorPorDia(List<String> diasPermitidos) {
-        this.diasPermitidos = diasPermitidos;
+        this.diasPermitidos = diasPermitidos != null ? diasPermitidos : Collections.emptyList();
     }
 
     @Override
-    public boolean esValido(BloqueHorario a, BloqueHorario b) {
-        if (!diasPermitidos.contains(a.getDia())) return false;
-        if (!diasPermitidos.contains(b.getDia())) return false;
+    public List<ResultadoValidacion> validar(BloqueHorario bloqueA, BloqueHorario bloqueB, HorarioSemana contexto) {
+        List<ResultadoValidacion> resultados = new ArrayList<>();
+        if (diasPermitidos.isEmpty()) {
+            return resultados;
+        }
 
-        return true;
-    }
+        // Este validador actúa sobre un solo bloque a la vez, pero lo llamamos en un contexto de pares.
+        // Validamos 'bloqueA' y podríamos validar 'bloqueB' si la lógica lo requiriera.
+        if (bloqueA.getDia() != null && !diasPermitidos.contains(bloqueA.getDia())) {
+            String mensaje = String.format(
+                "El bloque '%s' está en un día no permitido (%s).",
+                bloqueA.getMateria(), bloqueA.getDia()
+            );
+            resultados.add(new ResultadoValidacion(mensaje, ResultadoValidacion.Severidad.WARNING, bloqueA.getId()));
+        }
 
-    @Override
-    public String getTipoConflicto() {
-        return "Día no permitido";
+        if (bloqueB.getDia() != null && !diasPermitidos.contains(bloqueB.getDia())) {
+             String mensaje = String.format(
+                "El bloque '%s' está en un día no permitido (%s).",
+                bloqueB.getMateria(), bloqueB.getDia()
+            );
+            resultados.add(new ResultadoValidacion(mensaje, ResultadoValidacion.Severidad.WARNING, bloqueB.getId()));
+        }
+
+        return resultados;
     }
 }

@@ -172,7 +172,7 @@ public class AsignadorHorasLocalTime {
             if (other == bloque) continue;
             
             for (Validador v : validadoresHora) {
-                if (!v.esValido(bloque, other)) {
+                if (!v.validar(bloque, other, null).isEmpty()) { // Asumimos que para hora no se necesita el contexto completo
                     valido = false;
                     break;
                 }

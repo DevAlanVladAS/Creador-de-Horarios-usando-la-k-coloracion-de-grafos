@@ -10,6 +10,7 @@ import java.util.*;
  * - Nivel 1: BloqueHorario.BloqueChangeListener → Escucha cambios en bloques individuales
  * - Nivel 2: HorarioSemana.HorarioSemanaChangeListener → Escucha cambios estructurales
  * - Nivel 3: GestorHorarios.HorarioChangeListener → Notifica a las vistas (PanelHorario, PanelHorarioGrado)
+ * - Nivel de Validación: GestorHorarios.ValidationListener → Notifica a la UI sobre resultados de validación.
  * 
  * El gestor actúa como puente: escucha cambios del modelo y notifica a las vistas.
  */
@@ -25,9 +26,17 @@ public class GestorHorarios implements
     // Listeners de nivel superior (vistas de la UI)
     private final List<HorarioChangeListener> listeners;
     
+    // Listeners para resultados de validación
+    private final List<ValidationListener> validationListeners;
+    
+    // Controlador para ejecutar validaciones
+    private final ControladorValidacion controladorValidacion;
+
     private GestorHorarios() {
         horariosPorGrupo = new HashMap<>();
         listeners = new ArrayList<>();
+        validationListeners = new ArrayList<>();
+        controladorValidacion = new ControladorValidacion();
     }
     
     public static GestorHorarios getInstance() {
@@ -35,6 +44,28 @@ public class GestorHorarios implements
             instance = new GestorHorarios();
         }
         return instance;
+    }
+
+    // ========== Gestión de Listeners de Validación ==========
+
+    public interface ValidationListener {
+        void onValidationFinished(List<ResultadoValidacion> resultados);
+    }
+
+    public void addValidationListener(ValidationListener listener) {
+        if (!validationListeners.contains(listener)) {
+            validationListeners.add(listener);
+        }
+    }
+
+    public void removeValidationListener(ValidationListener listener) {
+        validationListeners.remove(listener);
+    }
+
+    private void notifyValidationListeners(List<ResultadoValidacion> resultados) {
+        for (ValidationListener listener : new ArrayList<>(validationListeners)) {
+            listener.onValidationFinished(resultados);
+        }
     }
     
     // ========== Gestión de HorarioSemana ==========
@@ -46,6 +77,7 @@ public class GestorHorarios implements
     public HorarioSemana getHorarioSemana(String grupoId) {
         return horariosPorGrupo.computeIfAbsent(grupoId, k -> {
             HorarioSemana semana = new HorarioSemana();
+            semana.inicializarDias(Arrays.asList("Lunes", "Martes", "Miércoles", "Jueves", "Viernes"));
             semana.addListener(this); // Escuchar cambios estructurales
             return semana;
         });
@@ -125,42 +157,28 @@ public class GestorHorarios implements
      * Este es el método principal llamado desde el drag & drop de la UI.
      */
     public void actualizarPosicionBloque(BloqueHorario bloque, String dia, LocalTime horaInicio) {
-        LocalTime horaFin = horaInicio != null ? 
-            horaInicio.plus(PlantillaHoraria.DURACION_BLOQUE) : null;
+        LocalTime horaFin = (horaInicio != null && bloque.getDuracion() != null) ? 
+            horaInicio.plus(bloque.getDuracion()) : null;
         
         String grupoId = bloque.getGrupoId();
-        HorarioSemana semana = horariosPorGrupo.get(grupoId);
+        HorarioSemana semana = getHorarioSemana(grupoId);
         
-        if (semana == null) {
-            // Si no hay horario para este grupo, solo actualizar el bloque
-            bloque.actualizarPosicion(dia, horaInicio, horaFin);
-            return;
-        }
-        
+        // Asignar a un día específico o mover a "sin asignar"
         if (dia == null) {
-            // Mover a sin asignar
             semana.agregarBloqueSinAsignar(bloque);
         } else {
-            // Asignar a un día específico
-            try {
-                semana.agregarBloqueEnDia(dia, bloque);
-            } catch (IllegalArgumentException e) {
-                // Si el día no existe, crear HorarioDia si es necesario
-                Optional<HorarioDia> diaOpt = semana.obtenerDiaPorNombre(dia);
-                if (diaOpt.isEmpty()) {
-                    HorarioDia nuevoDia = new HorarioDia(dia);
-                    semana.agregarDia(nuevoDia);
-                    semana.agregarBloqueEnDia(dia, bloque);
-                }
-            }
+            semana.agregarBloqueEnDia(dia, bloque);
         }
         
         // Actualizar las horas del bloque
-        bloque.setHoraInicio(horaInicio);
-        bloque.setHoraFin(horaFin);
+        bloque.actualizarPosicion(dia, horaInicio, horaFin);
         
-        // IMPORTANTE: Notificar a los listeners sobre el cambio de posición
+        // Notificar a los listeners de la UI sobre el cambio de posición
         notifyBloquesChanged(grupoId, TipoCambio.BLOQUE_MODIFICADO, bloque);
+
+        // Ejecutar validación después de cada movimiento y notificar
+        List<ResultadoValidacion> resultados = controladorValidacion.validarTodo(semana);
+        notifyValidationListeners(resultados);
     }
     
     /**

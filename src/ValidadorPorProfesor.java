@@ -1,33 +1,35 @@
 package src;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class ValidadorPorProfesor implements Validador {
 
-    private CatalogoRecursos catalogo;
-
-    public ValidadorPorProfesor(CatalogoRecursos catalogo) {
-        this.catalogo = catalogo;
+    public ValidadorPorProfesor() {
+        // Constructor por defecto
     }
 
+    /**
+     * Valida si los bloques son impartidos por el mismo profesor.
+     * @return Una lista con un resultado de ERROR si hay conflicto, o una lista vacía si no lo hay.
+     */
     @Override
-    public boolean esValido(BloqueHorario a, BloqueHorario b) {
-
-        if (!a.getProfesorId().equals(b.getProfesorId())) {
-            return true;
+    public List<ResultadoValidacion> validar(BloqueHorario a, BloqueHorario b, HorarioSemana contexto) {
+        if (a.getProfesorId() == null || b.getProfesorId() == null) {
+            return Collections.emptyList(); // No se puede determinar el conflicto.
         }
 
-        boolean mismoDia = a.getDia().equals(b.getDia());
-        boolean traslape =
-                a.getHoraInicio().isBefore(b.getHoraFin()) &&
-                a.getHoraFin().isAfter(b.getHoraInicio());
-
-        if (mismoDia && traslape) {
-            return false;
+        if (a.getProfesorId().equals(b.getProfesorId())) {
+            String mensaje = String.format("Mismo profesor (ID: %s)", a.getProfesorId());
+            var resultado = new ResultadoValidacion(
+                mensaje, 
+                ResultadoValidacion.Severidad.ERROR,
+                List.of(a.getId(), b.getId())
+            );
+            return List.of(resultado);
         }
 
-        return true;
-    }
-
-    @Override
-    public String getTipoConflicto() {
-        return "Conflicto de Profesor";
+        return Collections.emptyList(); // No hay conflicto.
     }
 }

@@ -66,8 +66,8 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         // FASE 3: Asignar horas dentro de cada día
         System.out.println("\n=== FASE 3: Asignación de horas ===");
         List<Validador> validadores = Arrays.asList(
-            new ValidadorPorProfesor(horarioGrafica.getCatalogo()),
-            new ValidadorPorSalon(horarioGrafica.getCatalogo()),
+            new ValidadorPorProfesor(),
+            new ValidadorPorSalon(),
             new ValidadorPorHora()
         );
         
@@ -179,14 +179,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
             if (color < dias.size()) {
                 String dia = dias.get(color);
                 
-                // Si el profesor no está disponible este día, saltar
-                if (!diasDisponiblesProfesor.isEmpty() && 
-                    !diasDisponiblesProfesor.contains(dia)) {
-                    continue;
-                }
-                
-                // Validar que no haya conflictos con otros bloques ya asignados a este día
-                if (hayConflictoEnDia(bloque, color, grafica, coloresAsignados, catalogo)) {
+                if (!esDiaValidoParaBloque(bloque, dia, coloresVecinos, diasDisponiblesProfesor)) {
                     continue;
                 }
             }
@@ -204,6 +197,16 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
                          bloque.getMateria() + ", asignando color " + color);
         return color;
     }
+
+    private boolean esDiaValidoParaBloque(BloqueHorario bloque, String dia, Set<Integer> coloresVecinos, Set<String> diasDisponiblesProfesor) {
+        int color = Arrays.asList("Lunes", "Martes", "Miércoles", "Jueves", "Viernes").indexOf(dia);
+        if (coloresVecinos.contains(color)) {
+            return false;
+        }
+        return diasDisponiblesProfesor.isEmpty() || diasDisponiblesProfesor.contains(dia);
+    }
+
+
     
     private Set<String> getDiasDisponiblesProfesor(BloqueHorario bloque, CatalogoRecursos catalogo) {
         if (bloque.getProfesorId() == null) {
@@ -228,33 +231,17 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
             int color,
             AdaptadorGraficaDeHorarios grafica,
             Map<String, Integer> coloresAsignados,
-            CatalogoRecursos catalogo) {
+            ValidadorDeHorarios validador) {
         
         // Obtener todos los bloques ya asignados a este color
-        List<String> bloquesEnMismoDia = coloresAsignados.entrySet().stream()
-                .filter(e -> e.getValue() == color)
-                .map(Map.Entry::getKey)
+        List<BloqueHorario> bloquesEnMismoDia = coloresAsignados.entrySet().stream()
+                .filter(e -> e.getValue().equals(color))
+                .map(e -> grafica.obtenerBloque(e.getKey()))
                 .collect(Collectors.toList());
         
-        // Verificar conflictos de recursos (profesor, salón)
-        for (String otroId : bloquesEnMismoDia) {
-            BloqueHorario otro = grafica.obtenerBloque(otroId);
-            
-            // Mismo profesor
-            if (bloque.getProfesorId() != null && 
-                bloque.getProfesorId().equals(otro.getProfesorId())) {
-                return true;
-            }
-            
-            // Mismo salón (si aplica)
-            if (bloque.getSalonId() != null && 
-                bloque.getSalonId().equals(otro.getSalonId())) {
-                return true;
-            }
-            
-            // Mismo grupo
-            if (bloque.getGrupoId() != null && 
-                bloque.getGrupoId().equals(otro.getGrupoId())) {
+        // Verificar conflictos usando el validador centralizado
+        for (BloqueHorario otro : bloquesEnMismoDia) {
+            if (validador.hayConflictoDirecto(bloque, otro)) {
                 return true;
             }
         }

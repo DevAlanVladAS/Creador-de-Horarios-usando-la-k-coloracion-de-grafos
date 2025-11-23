@@ -7,6 +7,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     private final Map<String, BloqueHorario> nodos;
     private final Map<String, Set<String>> adyacencias;
     private final CatalogoRecursos catalogo;
+    private final ValidadorDeHorarios validador;
     private int numAristas;
 
     public AdaptadorGraficaDeHorarios(CatalogoRecursos catalogo) {
@@ -14,6 +15,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         this.nodos = new HashMap<>();
         this.adyacencias = new HashMap<>();
         this.numAristas = 0;
+        this.validador = new ValidadorDeHorarios();
     }
 
     public AdaptadorGraficaDeHorarios(List<BloqueHorario> bloques, CatalogoRecursos catalogo) {
@@ -21,6 +23,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         this.nodos = new HashMap<>();
         this.adyacencias = new HashMap<>();
         this.numAristas = 0;
+        this.validador = new ValidadorDeHorarios();
 
         // Agregar todos los bloques como nodos
         for (BloqueHorario bloque : bloques) {
@@ -75,7 +78,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     }
 
     private boolean hayConflicto(BloqueHorario a, BloqueHorario b) {
-        // Lógica de solapamiento de tiempo, movida desde BloqueHorario.
+        // Lógica de solapamiento de tiempo.
         boolean seSolapanEnTiempo;
         if (a.getHoraInicio() == null || a.getHoraFin() == null || b.getHoraInicio() == null || b.getHoraFin() == null) {
             // Si las horas no están definidas, se asume que hay un posible conflicto de tiempo
@@ -92,15 +95,9 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
             return false;
         }
 
-        // Si se solapan (o podrían solaparse) en tiempo, verificar si comparten recursos.
-        boolean mismoProfesor = a.getProfesorId() != null &&
-                a.getProfesorId().equals(b.getProfesorId());
-        boolean mismoSalon = a.getSalonId() != null &&
-                a.getSalonId().equals(b.getSalonId());
-        boolean mismoGrupo = a.getGrupoId() != null &&
-                a.getGrupoId().equals(b.getGrupoId());
-
-        return mismoProfesor || mismoSalon || mismoGrupo;
+        // Si se solapan, delegar la validación de recursos al motor centralizado.
+        // Esto incluye validación de Profesor, Salón y Grupo.
+        return validador.hayConflictoDirecto(a, b);
     }
 
     public boolean sonAdyacentes(String bloqueIdA, String bloqueIdB) {
@@ -175,6 +172,10 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         return catalogo;
     }
 
+    public ValidadorDeHorarios getValidador() {
+        return validador;
+    }
+
     /**
      * Aplica k-coloración usando algoritmo greedy (DSatur simplificado).
      * Retorna un arreglo donde el índice corresponde al bloque y el valor es el color (día).
@@ -244,6 +245,10 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
 
         while (colores.size() < nodos.size()) {
             // 1. Encontrar el nodo con máxima saturación. En caso de empate, el de mayor grado.
+            // Para garantizar el determinismo, se ordena la lista antes de cada selección.
+            // Si hay empates en saturación y grado, siempre se elegirá el mismo nodo (el primero en orden alfabético).
+            Collections.sort(nodosNoColoreados);
+
             String nodoAColorear = null;
             int maxSat = -1;
             int maxGrad = -1;
