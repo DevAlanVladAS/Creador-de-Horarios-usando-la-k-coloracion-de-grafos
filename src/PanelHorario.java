@@ -4,6 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.*;
+import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -169,6 +170,37 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
 
         return true;
+    }
+
+    private boolean hayConflictoConOtrosBloques(BloqueHorario bloque, String dia, LocalTime horaInicio) {
+        if (dia == null || horaInicio == null) {
+            return false;
+        }
+
+        Duration duracion = bloque.getDuracion();
+        if (duracion == null || duracion.isZero()) {
+            duracion = Duration.ofMinutes(60); // fallback para bloques sin duración explícita
+        }
+        LocalTime horaFin = horaInicio.plus(duracion);
+
+        for (String grupoIdExistente : gestor.getGruposConHorarios()) {
+            for (BloqueHorario otro : gestor.getBloquesGrupo(grupoIdExistente)) {
+                if (otro.getId().equals(bloque.getId())) continue;
+                if (otro.getDia() == null || otro.getHoraInicio() == null || otro.getHoraFin() == null) continue;
+                if (!dia.equalsIgnoreCase(otro.getDia())) continue;
+
+                boolean seTraslapan = horaInicio.isBefore(otro.getHoraFin()) && horaFin.isAfter(otro.getHoraInicio());
+                if (!seTraslapan) continue;
+
+                boolean conflictoRecurso =
+                        (bloque.getProfesorId() != null && bloque.getProfesorId().equals(otro.getProfesorId())) ||
+                        (bloque.getSalonId() != null && bloque.getSalonId().equals(otro.getSalonId()));
+                if (conflictoRecurso) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void actualizarMerges() {
@@ -338,12 +370,12 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             CeldaHorario celda = (CeldaHorario) comp;
             boolean aceptado = false;
 
-            try {
-                Transferable tr = dtde.getTransferable();
-                if (!tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
-                    dtde.rejectDrop();
-                    return;
-                }
+                try {
+                    Transferable tr = dtde.getTransferable();
+                    if (!tr.isDataFlavorSupported(BloquePanel.DATA_FLAVOR)) {
+                        dtde.rejectDrop();
+                        return;
+                    }
 
                 BloqueHorario bloqueTransferido = (BloqueHorario) tr.getTransferData(BloquePanel.DATA_FLAVOR);
 
@@ -362,6 +394,15 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
                     return;
                 }
 
+                if (hayConflictoConOtrosBloques(bloqueTransferido, celda.dia, celda.hora)) {
+                    dtde.rejectDrop();
+                    JOptionPane.showMessageDialog(null,
+                            "Conflicto de horario: profesor o salón ya ocupado en otro grupo en este día/hora.",
+                            "Conflicto de recursos",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
                 dtde.acceptDrop(DnDConstants.ACTION_MOVE);
                 aceptado = true;
 
@@ -371,15 +412,19 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
 
                 SwingUtilities.invokeLater(PanelHorario.this::refrescarVista);
 
-                dtde.dropComplete(true);
+                    dtde.dropComplete(true);
 
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (!aceptado) {
-                    dtde.rejectDrop();
-                } else {
-                    dtde.dropComplete(false);
-                }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(null,
+                            "No se pudo mover el bloque: " + e.getMessage(),
+                            "Error en drag & drop",
+                            JOptionPane.ERROR_MESSAGE);
+                    if (!aceptado) {
+                        dtde.rejectDrop();
+                    } else {
+                        dtde.dropComplete(false);
+                    }
             } finally {
                 refrescando = false;
                 celda.actualizarBorde(false, false);
@@ -414,12 +459,25 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             if (parent != null && parent != this) {
                 parent.remove(panel);
             }
+            eliminarDuplicado(panel.getBloque().getId());
             if (lblEmpty.getParent() == this) {
                 remove(lblEmpty);
             }
             add(panel);
             revalidate();
             repaint();
+        }
+
+        private void eliminarDuplicado(String bloqueId) {
+            for (Component comp : getComponents()) {
+                if (comp instanceof BloquePanel) {
+                    BloquePanel bp = (BloquePanel) comp;
+                    if (bp.getBloque().getId().equals(bloqueId)) {
+                        remove(comp);
+                        break;
+                    }
+                }
+            }
         }
 
         void actualizarEstadoVacio() {

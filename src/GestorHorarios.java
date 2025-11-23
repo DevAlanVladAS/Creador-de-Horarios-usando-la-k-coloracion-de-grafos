@@ -157,8 +157,19 @@ public class GestorHorarios implements
      * Este es el método principal llamado desde el drag & drop de la UI.
      */
     public void actualizarPosicionBloque(BloqueHorario bloque, String dia, LocalTime horaInicio) {
-        LocalTime horaFin = (horaInicio != null && bloque.getDuracion() != null) ? 
-            horaInicio.plus(bloque.getDuracion()) : null;
+        // Preservar la duración original aunque el bloque se mande a "sin asignar".
+        java.time.Duration duracion = bloque.getDuracion();
+        if (duracion == null || duracion.isZero()) {
+            // Intentar reconstruir a partir de las horas actuales si existen
+            if (bloque.getHoraInicio() != null && bloque.getHoraFin() != null) {
+                duracion = java.time.Duration.between(bloque.getHoraInicio(), bloque.getHoraFin());
+            }
+        }
+
+        LocalTime horaInicioFinal = horaInicio != null ? horaInicio : bloque.getHoraInicio();
+        LocalTime horaFin = (horaInicioFinal != null && duracion != null && !duracion.isZero())
+            ? horaInicioFinal.plus(duracion)
+            : bloque.getHoraFin();
         
         String grupoId = bloque.getGrupoId();
         HorarioSemana semana = getHorarioSemana(grupoId);
@@ -171,7 +182,7 @@ public class GestorHorarios implements
         }
         
         // Actualizar las horas del bloque
-        bloque.actualizarPosicion(dia, horaInicio, horaFin);
+        bloque.actualizarPosicion(dia, horaInicioFinal, horaFin);
         
         // Notificar a los listeners de la UI sobre el cambio de posición
         notifyBloquesChanged(grupoId, TipoCambio.BLOQUE_MODIFICADO, bloque);

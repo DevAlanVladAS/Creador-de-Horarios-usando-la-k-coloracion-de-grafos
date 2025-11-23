@@ -226,12 +226,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         return new HashSet<>(dias);
     }
     
-    private boolean hayConflictoEnDia(
-            BloqueHorario bloque,
-            int color,
-            AdaptadorGraficaDeHorarios grafica,
-            Map<String, Integer> coloresAsignados,
-            ValidadorDeHorarios validador) {
+    private boolean hayConflictoEnDia(BloqueHorario bloque, int color, AdaptadorGraficaDeHorarios grafica, Map<String, Integer> coloresAsignados, ValidadorDeHorarios validador) {
         
         // Obtener todos los bloques ya asignados a este color
         List<BloqueHorario> bloquesEnMismoDia = coloresAsignados.entrySet().stream()
