@@ -1,18 +1,15 @@
 package src;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * Validador que comprueba si dos bloques de horario entran en conflicto
- * porque están asignados al mismo grupo.
+ * Valida conflictos por grupo: detecta solapes entre bloques del mismo grupo.
  */
 public class ValidadorPorGrupo implements Validador {
 
     /**
-     * Valida si los bloques son para el mismo grupo.
-     * @return Una lista con un resultado de ERROR si hay conflicto, o una lista vacía si no lo hay.
+     * Valida si dos bloques del mismo grupo se traslapan en el mismo dia.
      */
     @Override
     public List<ResultadoValidacion> validar(BloqueHorario a, BloqueHorario b, HorarioSemana contexto) {

@@ -6,17 +6,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Clase que valida las reglas de los horarios.
- * Compara todos los bloques de un horario entre sí para detectar conflictos.
+ * Ejecuta las validaciones (unitarias y de conflicto) sobre un horario semanal.
  */
 public class ValidadorDeHorarios {
 
     private final List<Validador> validadoresDeConflicto;
     private final List<UnaryValidator> validadoresUnitarios;
 
-    /**
-     * Constructor que inicializa todos los validadores de reglas de negocio.
-     */
+    /** Inicializa validadores de reglas de negocio (conflictos y unitarios). */
     public ValidadorDeHorarios() {
         // Validadores binarios para conflictos (generan ERRORES)
         validadoresDeConflicto = new ArrayList<>();
@@ -30,10 +27,9 @@ public class ValidadorDeHorarios {
     }
 
     /**
-     * Ejecuta todas las validaciones (unitarias y de conflicto) sobre el horario dado.
-     * 
-     * @param horario el horario semanal a validar.
-     * @return lista de todos los resultados de validación (errores y advertencias).
+     * Ejecuta validaciones unitarias y de conflicto sobre el horario dado.
+     * @param horario horario semanal a validar
+     * @return lista de resultados (errores y advertencias)
      */
     public List<ResultadoValidacion> validar(HorarioSemana horario) {
         List<ResultadoValidacion> resultados = new ArrayList<>();
@@ -72,11 +68,7 @@ public class ValidadorDeHorarios {
 
     /**
      * Comprueba si existe un conflicto directo de recursos entre dos bloques.
-     * Un conflicto directo se considera un ERROR de validación.
-     * 
-     * @param a Bloque A
-     * @param b Bloque B
-     * @return true si hay conflicto de tipo ERROR, false en caso contrario.
+     * @return true si hay conflicto de tipo ERROR
      */
     public boolean hayConflictoDirecto(BloqueHorario a, BloqueHorario b) {
         // Si no hay información de día/hora, considerar conflicto potencial cuando comparten recursos,
@@ -104,12 +96,7 @@ public class ValidadorDeHorarios {
         return false;
     }
 
-    /**
-     * Determina si dos bloques de horario se solapan en el tiempo en el mismo día.
-     * @param a Bloque de horario A.
-     * @param b Bloque de horario B.
-     * @return true si hay solapamiento, false en caso contrario.
-     */
+    /** Determina si dos bloques se solapan en el tiempo en el mismo dia. */
     private boolean seSolapanEnTiempo(BloqueHorario a, BloqueHorario b) {
         // Primero, verificar si son del mismo día. Si no, no pueden solaparse.
         if (a.getDia() == null || b.getDia() == null || !a.getDia().equals(b.getDia())) {

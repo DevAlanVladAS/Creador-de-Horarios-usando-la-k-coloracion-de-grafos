@@ -165,6 +165,7 @@ public class ProyectoDatos {
         return new ProyectoDatos(configuracion, profesores, salones, grupos, materias, asignaciones, bloques, asignacionBloques);
     }
 
+    /** Serializa la configuracion del proyecto a JSON. */
     private String configuracionToJson() {
         ConfiguracionProyecto config = configuracion != null ? configuracion : new ConfiguracionProyecto();
         StringBuilder sb = new StringBuilder();
@@ -182,6 +183,7 @@ public class ProyectoDatos {
         return sb.toString();
     }
 
+    /** Serializa un profesor a JSON. */
     private String profesorToJson(Profesor profesor) {
         return new StringBuilder()
                 .append("{")
@@ -195,6 +197,7 @@ public class ProyectoDatos {
                 .toString();
     }
 
+    /** Serializa un salon a JSON. */
     private String salonToJson(Salon salon) {
         return new StringBuilder()
                 .append("{")
@@ -205,6 +208,7 @@ public class ProyectoDatos {
                 .toString();
     }
 
+    /** Serializa un grupo a JSON. */
     private String grupoToJson(GrupoEstudiantes grupo) {
         return new StringBuilder()
                 .append("{")
@@ -216,6 +220,7 @@ public class ProyectoDatos {
                 .toString();
     }
 
+    /** Serializa una materia a JSON. */
     private String materiaToJson(Materia materia) {
         return new StringBuilder()
                 .append("{")
@@ -226,6 +231,7 @@ public class ProyectoDatos {
                 .toString();
     }
 
+    /** Serializa una asignacion academica a JSON. */
     private String asignacionToJson(AsignacionAcademica asignacion) {
         return new StringBuilder()
                 .append("{")
@@ -238,6 +244,7 @@ public class ProyectoDatos {
                 .append("}")
                 .toString();
     }
+    /** Serializa un bloque de horario a JSON (incluyendo asignacion asociada). */
     private String bloqueToJson(BloqueHorario bloque, Map<String, String> asignacionPorBloque) {
         return new StringBuilder()
                 .append("{")
@@ -257,6 +264,7 @@ public class ProyectoDatos {
                 .toString();
     }
 
+    /** Serializa una lista usando el mapper indicado. */
     private <T> String arrayToJson(List<T> datos, Function<T, String> mapper) {
         StringBuilder sb = new StringBuilder("[");
         if (datos != null) {
@@ -271,6 +279,7 @@ public class ProyectoDatos {
         return sb.toString();
     }
 
+    /** Crea una copia defensiva de la configuracion. */
     private static ConfiguracionProyecto copiarConfiguracion(ConfiguracionProyecto original) {
         ConfiguracionProyecto copia = new ConfiguracionProyecto();
         if (original != null) {
@@ -282,6 +291,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de profesores. */
     private static List<Profesor> copiarProfesores(List<Profesor> origen) {
         List<Profesor> copia = new ArrayList<>();
         if (origen == null) {
@@ -301,6 +311,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de salones. */
     private static List<Salon> copiarSalones(List<Salon> origen) {
         List<Salon> copia = new ArrayList<>();
         if (origen == null) {
@@ -312,6 +323,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de grupos. */
     private static List<GrupoEstudiantes> copiarGrupos(List<GrupoEstudiantes> origen) {
         List<GrupoEstudiantes> copia = new ArrayList<>();
         if (origen == null) {
@@ -323,6 +335,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de materias. */
     private static List<Materia> copiarMaterias(List<Materia> origen) {
         List<Materia> copia = new ArrayList<>();
         if (origen == null) {
@@ -334,6 +347,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de bloques y rellena map opcional por id. */
     private static List<BloqueHorario> copiarBloques(List<BloqueHorario> origen, Map<String, BloqueHorario> destinoMap) {
         List<BloqueHorario> copia = new ArrayList<>();
         if (origen == null) {
@@ -361,6 +375,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Copia defensiva de asignaciones y reconstruye relaciones con bloques. */
     private static List<AsignacionAcademica> copiarAsignaciones(List<AsignacionAcademica> origen,
                                                                 Map<String, BloqueHorario> bloquesPorId,
                                                                 Map<String, List<String>> mapaAsignacionBloques) {
@@ -397,6 +412,7 @@ public class ProyectoDatos {
         }
         return copia;
     }
+    /** Copia defensiva del mapa asignacion -> lista de bloques. */
     private static Map<String, List<String>> copiarMapaAsignacion(Map<String, List<String>> original) {
         Map<String, List<String>> copia = new HashMap<>();
         if (original == null) {
@@ -408,6 +424,7 @@ public class ProyectoDatos {
         return copia;
     }
 
+    /** Invierte el mapa para obtener bloque -> asignacion. */
     private static Map<String, String> crearMapaBloqueAsignacion(Map<String, List<String>> relacion) {
         Map<String, String> inverso = new HashMap<>();
         if (relacion == null) {
@@ -424,6 +441,7 @@ public class ProyectoDatos {
         return inverso;
     }
 
+    /** Deserializa ConfiguracionProyecto desde mapa parsed JSON. */
     private static ConfiguracionProyecto parseConfiguracion(Map<String, Object> data) {
         ConfiguracionProyecto configuracion = new ConfiguracionProyecto();
         configuracion.setNombreEscuela(asString(data.get("nombreEscuela")));
@@ -435,6 +453,7 @@ public class ProyectoDatos {
         return configuracion;
     }
 
+    /** Deserializa profesores desde lista de mapas. */
     private static List<Profesor> parseProfesores(List<Object> data) {
         List<Profesor> profesores = new ArrayList<>();
         for (Object item : data) {
@@ -451,6 +470,7 @@ public class ProyectoDatos {
         return profesores;
     }
 
+    /** Deserializa salones desde lista de mapas. */
     private static List<Salon> parseSalones(List<Object> data) {
         List<Salon> salones = new ArrayList<>();
         for (Object item : data) {
@@ -464,6 +484,7 @@ public class ProyectoDatos {
         return salones;
     }
 
+    /** Deserializa grupos desde lista de mapas. */
     private static List<GrupoEstudiantes> parseGrupos(List<Object> data) {
         List<GrupoEstudiantes> grupos = new ArrayList<>();
         for (Object item : data) {
@@ -478,6 +499,7 @@ public class ProyectoDatos {
         return grupos;
     }
 
+    /** Deserializa materias desde lista de mapas. */
     private static List<Materia> parseMaterias(List<Object> data) {
         List<Materia> materias = new ArrayList<>();
         for (Object item : data) {
@@ -491,6 +513,7 @@ public class ProyectoDatos {
         return materias;
     }
 
+    /** Deserializa asignaciones desde lista de mapas. */
     private static List<AsignacionAcademica> parseAsignaciones(List<Object> data) {
         List<AsignacionAcademica> asignaciones = new ArrayList<>();
         for (Object item : data) {
@@ -507,6 +530,7 @@ public class ProyectoDatos {
         return asignaciones;
     }
 
+    /** Deserializa bloques y rellena mapas auxiliares. */
     private static List<BloqueHorario> parseBloques(List<Object> data,
                                                     Map<String, BloqueHorario> bloquesPorId,
                                                     Map<String, List<String>> asignacionBloques) {
@@ -547,6 +571,7 @@ public class ProyectoDatos {
         }
         return bloques;
     }
+    /** Intenta castear a Map, devolviendo copia defensiva o vacio. */
     private static Map<String, Object> castToMap(Object value) {
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> copy = new HashMap<>();
@@ -556,6 +581,7 @@ public class ProyectoDatos {
         return Collections.emptyMap();
     }
 
+    /** Intenta castear a List, devolviendo copia defensiva o vacio. */
     private static List<Object> castToList(Object value) {
         if (value instanceof List<?> list) {
             return new ArrayList<>(list);
@@ -674,6 +700,7 @@ public class ProyectoDatos {
         }
         return sb.toString();
     }
+    /** Parser JSON muy simple para las estructuras serializadas del proyecto. */
     private static final class SimpleJsonParser {
         private final String text;
         private int index;

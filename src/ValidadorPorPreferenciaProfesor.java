@@ -5,39 +5,37 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Validador que comprueba si un bloque de horario respeta las preferencias de
- * día de un profesor. Este validador genera advertencias (WARNINGS), no errores.
+ * Valida que un bloque respete las preferencias de dia del profesor (warning si no).
  */
 public class ValidadorPorPreferenciaProfesor implements UnaryValidator {
 
     private final CatalogoRecursos catalogo;
 
+    /**
+     * Usa el CatalogoRecursos singleton para consultar disponibilidad.
+     */
     public ValidadorPorPreferenciaProfesor() {
         this.catalogo = CatalogoRecursos.getInstance();
     }
 
     /**
-     * Valida la preferencia de día del profesor para un bloque de horario.
-     * @param bloque El bloque a validar.
-     * @return Una lista con una advertencia si no se cumple la preferencia, o una lista vacía.
+     * Genera advertencia si el bloque se ubica en un dia fuera de la disponibilidad del profesor.
      */
     @Override
     public List<ResultadoValidacion> validar(BloqueHorario bloque) {
         if (bloque.getProfesorId() == null || bloque.getDia() == null) {
-            return Collections.emptyList(); // No se puede validar sin profesor o día.
+            return Collections.emptyList();
         }
 
         Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
         if (profesor == null) {
-            return Collections.emptyList(); // Profesor no encontrado.
+            return Collections.emptyList();
         }
 
-        // Si el profesor tiene una lista de días preferidos y el día del bloque no está en ella,
-        // se genera una advertencia.
         if (!profesor.getDiasDisponibles().isEmpty() && !profesor.disponibleEn(bloque.getDia())) {
             List<ResultadoValidacion> resultados = new ArrayList<>();
             String mensaje = String.format(
-                "Preferencia de profesor: %s no tiene disponibilidad el día %s.",
+                "Preferencia de profesor: %s no tiene disponibilidad el dia %s.",
                 profesor.getNombre(),
                 bloque.getDia()
             );
@@ -45,6 +43,6 @@ public class ValidadorPorPreferenciaProfesor implements UnaryValidator {
             return resultados;
         }
 
-        return Collections.emptyList(); // La preferencia se cumple.
+        return Collections.emptyList();
     }
 }

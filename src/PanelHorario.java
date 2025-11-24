@@ -18,7 +18,7 @@ import java.util.Set;
 public class PanelHorario extends JPanel implements GestorHorarios.HorarioChangeListener {
 
     private static final DateTimeFormatter HORA_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
-    private static final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
+    private static final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miercoles", "Jueves", "Viernes"};
 
     private final LocalTime[] HORAS_DIA = PlantillaHoraria.BLOQUES_ESTANDAR.toArray(new LocalTime[0]);
     private final JPanel gridPanel;
@@ -31,6 +31,9 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
 
     private boolean refrescando = false;
 
+    /**
+     * Crea el panel de horario para el grupo indicado y registra listeners.
+     */
     public PanelHorario(String grupoId) {
         this.grupoId = grupoId;
         this.gestor = GestorHorarios.getInstance();
@@ -48,6 +51,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         refrescarVista();
     }
 
+    /** Construye la grilla de dias/horas y el panel lateral de sin asignar. */
     private void construirUI() {
         gridPanel.add(new JLabel(""));
         for (String dia : DIAS_SEMANA) {
@@ -88,6 +92,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
+    /** Refresca la vista leyendo el estado actual del gestor. */
     private void refrescarVista() {
         if (refrescando) return;
 
@@ -131,6 +136,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
+    /** Obtiene la celda de la grilla para un dia/hora. */
     private CeldaHorario getCelda(String dia, LocalTime hora) {
         for (CeldaHorario celda : celdas) {
             if (celda.dia.equalsIgnoreCase(dia) && celda.hora.equals(hora)) {
@@ -140,6 +146,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         return null;
     }
 
+    /** Agrega un bloque al panel de sin asignar. */
     private void agregarBloqueSinAsignar(BloqueHorario bloque) {
         BloquePanel panel = new BloquePanel(bloque);
         panel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -147,6 +154,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         panelSinAsignar.addBloquePanel(panel);
     }
 
+    /** Verifica si el profesor tiene disponibilidad en un dia/hora. */
     private boolean esDisponibleParaProfesor(String profesorId, String dia, LocalTime hora) {
         if (profesorId == null) return true;
 
@@ -172,6 +180,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         return true;
     }
 
+    /** Revisa solapes con bloques de otros grupos que compartan profesor/salon. */
     private boolean hayConflictoConOtrosBloques(BloqueHorario bloque, String dia, LocalTime horaInicio) {
         if (dia == null || horaInicio == null) {
             return false;
@@ -203,6 +212,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         return false;
     }
 
+    /** Actualiza el estado visual de union entre bloques consecutivos. */
     public void actualizarMerges() {
         for (CeldaHorario celda : celdas) {
             BloquePanel panel = celda.obtenerBloquePanel();
@@ -231,6 +241,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
+    /** Indica si dos bloques consecutivos deben mostrarse unidos. */
     private boolean debenUnirse(BloquePanel a, BloquePanel b) {
         if (a == null || b == null) return false;
         BloqueHorario bloqueA = a.getBloque();
@@ -269,6 +280,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         gestor.removeListener(this);
     }
 
+    /** Celda de la grilla (dia/hora) que acepta drops y contiene BloquePanel. */
     protected static class CeldaHorario extends JPanel {
         protected final String dia;
         protected final LocalTime hora;
@@ -338,6 +350,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
+    /** Listener de drop para las celdas del grid. */
     protected class CeldaDropListener implements DropTargetListener {
 
         @Override
@@ -432,10 +445,12 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
         }
     }
 
+    /** Panel lateral que contiene los bloques sin asignar y acepta drops. */
     public static class PanelSinAsignar extends JPanel implements DropTargetListener {
         private final JLabel lblEmpty;
         private final GestorHorarios gestor;
 
+        /** Crea el panel usando un gestor dado (o singleton si es null). */
         public PanelSinAsignar(GestorHorarios gestor) {
             this.gestor = gestor != null ? gestor : GestorHorarios.getInstance();
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -447,6 +462,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             new DropTarget(this, DnDConstants.ACTION_MOVE, this, true);
         }
 
+        /** Limpia el listado y muestra placeholder vacio. */
         void resetContenido() {
             removeAll();
             add(lblEmpty);
@@ -454,6 +470,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             repaint();
         }
 
+        /** Agrega un panel de bloque al listado de sin asignar. */
         void addBloquePanel(BloquePanel panel) {
             Container parent = panel.getParent();
             if (parent != null && parent != this) {
@@ -480,6 +497,7 @@ public class PanelHorario extends JPanel implements GestorHorarios.HorarioChange
             }
         }
 
+        /** Muestra u oculta el placeholder segun haya bloques. */
         void actualizarEstadoVacio() {
             boolean hayBloques = false;
             for (Component comp : getComponents()) {

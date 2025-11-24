@@ -4,6 +4,9 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Valida solapes horarias entre dos bloques en el mismo dia.
+ */
 public class ValidadorPorHora implements Validador {
 
     @Override
@@ -11,11 +14,11 @@ public class ValidadorPorHora implements Validador {
         List<ResultadoValidacion> resultados = new ArrayList<>();
 
         if (bloqueA.getDia() == null || bloqueB.getDia() == null || !bloqueA.getDia().equals(bloqueB.getDia())) {
-            return resultados; // No son del mismo día, no hay conflicto de hora.
+            return resultados;
         }
 
         if (bloqueA.getHoraInicio() == null || bloqueA.getHoraFin() == null || bloqueB.getHoraInicio() == null || bloqueB.getHoraFin() == null) {
-            return resultados; // No se pueden comparar si no tienen horas
+            return resultados;
         }
 
         LocalTime inicioA = bloqueA.getHoraInicio();
@@ -23,12 +26,11 @@ public class ValidadorPorHora implements Validador {
         LocalTime inicioB = bloqueB.getHoraInicio();
         LocalTime finB = bloqueB.getHoraFin();
 
-        // Traslape: A empieza antes de que termine B Y A termina despues de que empieza B
         boolean seTraslapan = inicioA.isBefore(finB) && finA.isAfter(inicioB);
 
         if (seTraslapan) {
             String descripcion = String.format(
-                "Conflicto de horario: El bloque '%s' (%s - %s) se solapa con el bloque '%s' (%s - %s) en el día %s.",
+                "Conflicto de horario: El bloque '%s' (%s - %s) se solapa con el bloque '%s' (%s - %s) en el dia %s.",
                 bloqueA.getMateria(), inicioA, finA,
                 bloqueB.getMateria(), inicioB, finB,
                 bloqueA.getDia()

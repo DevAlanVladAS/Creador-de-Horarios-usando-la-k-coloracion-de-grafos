@@ -3,16 +3,15 @@ package src;
 import java.util.List;
 
 /**
- * Interfaz para validadores que comprueban las propiedades de un único bloque de horario.
- * A diferencia de `Validador`, no compara dos bloques, sino que analiza uno solo.
- * Es ideal para reglas de negocio o preferencias que aplican a un bloque individualmente.
+ * Validador para un unico bloque de horario (no compara pares como Validador).
+ * Ideal para reglas o preferencias que aplican a un bloque individual.
  */
 public interface UnaryValidator {
 
     /**
-     * Valida las propiedades de un único bloque de horario.
-     * @param bloque El bloque a validar.
-     * @return Una lista de `ResultadoValidacion`. Si la lista está vacía, el bloque es válido según esta regla.
+     * Valida las propiedades de un bloque concreto.
+     * @param bloque bloque a evaluar
+     * @return lista de resultados; vacia si pasa la regla
      */
     List<ResultadoValidacion> validar(BloqueHorario bloque);
 

@@ -1,30 +1,30 @@
 package src;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Valida conflictos de horario entre bloques impartidos por el mismo profesor.
+ */
 public class ValidadorPorProfesor implements Validador {
 
+    /** Constructor por defecto. */
     public ValidadorPorProfesor() {
-        // Constructor por defecto
     }
 
     /**
-     * Valida si los bloques son impartidos por el mismo profesor.
-     * @return Una lista con un resultado de ERROR si hay conflicto, o una lista vacía si no lo hay.
+     * Retorna error si dos bloques del mismo profesor se solapan en dia/hora.
      */
     @Override
     public List<ResultadoValidacion> validar(BloqueHorario a, BloqueHorario b, HorarioSemana contexto) {
         if (a.getProfesorId() == null || b.getProfesorId() == null) {
-            return Collections.emptyList(); // No se puede determinar el conflicto.
+            return Collections.emptyList();
         }
 
         if (!a.getProfesorId().equals(b.getProfesorId())) {
             return Collections.emptyList();
         }
 
-        // Solo hay conflicto si coinciden en día y horario.
         if (a.getDia() != null && b.getDia() != null &&
             a.getDia().equalsIgnoreCase(b.getDia()) &&
             seTraslapan(a, b)) {
@@ -37,7 +37,7 @@ public class ValidadorPorProfesor implements Validador {
             return List.of(resultado);
         }
 
-        return Collections.emptyList(); // No hay conflicto.
+        return Collections.emptyList();
     }
 
     private boolean seTraslapan(BloqueHorario a, BloqueHorario b) {
