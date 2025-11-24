@@ -22,6 +22,28 @@ public class ProyectoDatos {
     private final List<BloqueHorario> bloques;
     private final Map<String, List<String>> asignacionBloques;
 
+    /**
+     * Crea un snapshot asegurando que las posiciones (dia/hora) visibles en el gestor
+     * se vuelquen primero al catalogo antes de serializar.
+     */
+    public static ProyectoDatos desdeEstadoActual(ConfiguracionProyecto configuracion,
+                                                  CatalogoRecursos catalogo,
+                                                  GestorHorarios gestor) {
+        if (catalogo == null) {
+            throw new IllegalArgumentException("El catalogo no puede ser nulo");
+        }
+        if (gestor != null) {
+            for (BloqueHorario bloqueCatalogo : catalogo.getTodosLosBloques()) {
+                gestor.buscarBloquePorId(bloqueCatalogo.getId()).ifPresent(bGestor -> {
+                    bloqueCatalogo.setDia(bGestor.getDia());
+                    bloqueCatalogo.setHoraInicio(bGestor.getHoraInicio());
+                    bloqueCatalogo.setHoraFin(bGestor.getHoraFin());
+                });
+            }
+        }
+        return new ProyectoDatos(configuracion, catalogo);
+    }
+
     public ProyectoDatos(ConfiguracionProyecto configuracionOriginal, CatalogoRecursos catalogo) {
         if (catalogo == null) {
             throw new IllegalArgumentException("El catÃ¡logo no puede ser nulo");
@@ -520,15 +542,17 @@ public class ProyectoDatos {
         return bloques;
     }
     private static Map<String, Object> castToMap(Object value) {
-        if (value instanceof Map) {
-            return (Map<String, Object>) value;
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> copy = new HashMap<>();
+            map.forEach((k, v) -> copy.put(String.valueOf(k), v));
+            return copy;
         }
         return Collections.emptyMap();
     }
 
     private static List<Object> castToList(Object value) {
-        if (value instanceof List) {
-            return (List<Object>) value;
+        if (value instanceof List<?> list) {
+            return new ArrayList<>(list);
         }
         return Collections.emptyList();
     }

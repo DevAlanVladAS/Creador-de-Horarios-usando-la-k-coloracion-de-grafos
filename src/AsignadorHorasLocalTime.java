@@ -168,6 +168,17 @@ public class AsignadorHorasLocalTime {
 
         // 4. Validadores
         boolean valido = true;
+
+        // Regla: no más de 2 horas seguidas de la misma materia en el día
+        if (excedeMaximoConsecutivoMateria(bloque, asignados)) {
+            valido = false;
+        }
+
+        // Regla adicional: máximo 2 horas totales al día por materia (no dividir en dos tramos separados)
+        if (valido && excedeMaximoDiarioMateria(bloque, asignados, todosLosBloquesDelDia, dur)) {
+            valido = false;
+        }
+
         for (BloqueHorario other : asignados) {
             if (other == bloque) continue;
             
@@ -194,6 +205,105 @@ public class AsignadorHorasLocalTime {
         }
 
         return false;
+    }
+
+    /**
+     * Verifica si al colocar este bloque se exceden 2 horas consecutivas de la misma materia en el día.
+     */
+    private boolean excedeMaximoConsecutivoMateria(BloqueHorario bloque, List<BloqueHorario> asignados) {
+        if (bloque.getMateria() == null || bloque.getHoraInicio() == null || bloque.getHoraFin() == null) {
+            return false;
+        }
+
+        // Reunir todos los intervalos de la misma materia (incluyendo el bloque actual)
+        List<BloqueHorario> mismos = new ArrayList<>();
+        mismos.add(bloque);
+        for (BloqueHorario b : asignados) {
+            if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                    && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                mismos.add(b);
+            }
+        }
+
+        if (mismos.isEmpty()) return false;
+
+        // Ordenar por inicio y encontrar cadenas consecutivas
+        mismos.sort(Comparator.comparing(BloqueHorario::getHoraInicio));
+        LocalTime cadenaInicio = mismos.get(0).getHoraInicio();
+        LocalTime cadenaFin = mismos.get(0).getHoraFin();
+
+        for (int i = 1; i < mismos.size(); i++) {
+            BloqueHorario actual = mismos.get(i);
+            if (actual.getHoraInicio().equals(cadenaFin)) {
+                // continuidad exacta
+                cadenaFin = actual.getHoraFin();
+            } else if (actual.getHoraInicio().isBefore(cadenaFin)) {
+                // solape — ya sería conflicto por validador de hora
+                cadenaFin = max(cadenaFin, actual.getHoraFin());
+            } else {
+                // nueva cadena
+                cadenaInicio = actual.getHoraInicio();
+                cadenaFin = actual.getHoraFin();
+            }
+
+            if (Duration.between(cadenaInicio, cadenaFin).toMinutes() > 120) {
+                return true;
+            }
+        }
+
+        // También evaluar la primera cadena sola
+        if (Duration.between(mismos.get(0).getHoraInicio(), mismos.get(0).getHoraFin()).toMinutes() > 120) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifica que la suma total de horas de la materia en el día no supere 120 minutos,
+     * incluso si estuvieran separadas por huecos.
+     */
+    private boolean excedeMaximoDiarioMateria(BloqueHorario bloque,
+                                              List<BloqueHorario> asignados,
+                                              List<BloqueHorario> todosLosBloquesDelDia,
+                                              Duration durNuevo) {
+        if (bloque.getMateria() == null) {
+            return false;
+        }
+
+        long minutos = durNuevo != null ? durNuevo.toMinutes() : 0;
+
+        // Usar conjunto para evitar contar el mismo bloque dos veces
+        java.util.Set<String> vistos = new java.util.HashSet<>();
+        String idBloque = bloque.getId();
+
+        for (BloqueHorario b : asignados) {
+            if (b == null || b.getId() == null || b.getId().equals(idBloque)) continue;
+            if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                    && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                if (vistos.add(b.getId())) {
+                    minutos += Duration.between(b.getHoraInicio(), b.getHoraFin()).toMinutes();
+                }
+            }
+        }
+        // incluir otros bloques del día ya existentes aunque no estén en asignados, excepto el mismo bloque
+        if (todosLosBloquesDelDia != null) {
+            for (BloqueHorario b : todosLosBloquesDelDia) {
+                if (b == null || b.getId() == null || b.getId().equals(idBloque)) continue;
+                if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                        && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                    if (vistos.add(b.getId())) {
+                        minutos += Duration.between(b.getHoraInicio(), b.getHoraFin()).toMinutes();
+                    }
+                }
+            }
+        }
+
+        return minutos > 120;
+    }
+
+    private LocalTime max(LocalTime a, LocalTime b) {
+        return a.isAfter(b) ? a : b;
     }
 
     /**

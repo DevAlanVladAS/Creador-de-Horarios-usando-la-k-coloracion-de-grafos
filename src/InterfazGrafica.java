@@ -1,4 +1,4 @@
-﻿package src;
+package src;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -12,13 +12,6 @@ import java.util.Comparator;
 import javax.imageio.ImageIO;
 
 public class InterfazGrafica extends JFrame implements GestorHorarios.ValidationListener {
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            InterfazGrafica frame = new InterfazGrafica();
-            frame.setVisible(true);
-        });
-    }
 
     private JTabbedPane tabbedPanelHorarios;
     private JButton btnCrearHorario;
@@ -78,20 +71,27 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
             
             
             HorarioSemana semana = gestor.getHorarioSemana(grupoId);
-            
-            
-            List<BloqueHorario> bloquesExistentes = new ArrayList<>(semana.getBloques());
-            for (BloqueHorario bloqueExistente : bloquesExistentes) {
-                semana.eliminarBloque(bloqueExistente.getId());
-            }
-            
-           
+            // --- Sincronización no destructiva para preservar posiciones manuales ---
+            // 1) Agregar los bloques nuevos que estén en catálogo y no en el gestor.
+            var existentes = new ArrayList<>(semana.getBloques());
+            var idsExistentes = existentes.stream().map(BloqueHorario::getId).collect(Collectors.toSet());
             for (BloqueHorario bloque : bloquesDelGrupo) {
-                gestor.agregarBloque(bloque, grupoId);
-                
-                
+                if (!idsExistentes.contains(bloque.getId())) {
+                    gestor.agregarBloque(bloque, grupoId);
+                }
+                // Reaplicar la posición almacenada (si la hay) sin borrar otras posiciones.
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
                     gestor.actualizarPosicionBloque(bloque, bloque.getDia(), bloque.getHoraInicio());
+                } else if (bloque.getDia() == null) {
+                    semana.agregarBloqueSinAsignar(bloque);
+                }
+            }
+
+            // 2) Remover bloques que ya no existan en catálogo.
+            var idsCatalogo = bloquesDelGrupo.stream().map(BloqueHorario::getId).collect(Collectors.toSet());
+            for (BloqueHorario bloqueExistente : existentes) {
+                if (!idsCatalogo.contains(bloqueExistente.getId())) {
+                    semana.eliminarBloque(bloqueExistente.getId());
                 }
             }
         }
@@ -260,6 +260,9 @@ public class InterfazGrafica extends JFrame implements GestorHorarios.Validation
             JOptionPane.showMessageDialog(this, "No hay una vista de horario seleccionada para exportar.", "Exportar", JOptionPane.WARNING_MESSAGE);
             return;
         }
+
+        // Persistir posiciones actuales en el catálogo antes de exportar imágenes.
+        sincronizarPosicionesGestorACatalogo();
 
         // Exportar una vista consolidada de grado en archivos separados por grupo
         if (vistaActual instanceof PanelHorarioGrado panelGrado) {
@@ -469,6 +472,20 @@ private void mostrarPlaceholderCrearHorario() {
         refrescarDatosYBloquesExistentes();
     }
 
+    /**
+     * Vuelca las posiciones actuales (día y horas) desde el gestor hacia el catálogo
+     * para que al exportar/guardar se persista el estado visible en pantalla.
+     */
+    private void sincronizarPosicionesGestorACatalogo() {
+        for (BloqueHorario bloqueCatalogo : catalogo.getTodosLosBloques()) {
+            gestor.buscarBloquePorId(bloqueCatalogo.getId()).ifPresent(bGestor -> {
+                bloqueCatalogo.setDia(bGestor.getDia());
+                bloqueCatalogo.setHoraInicio(bGestor.getHoraInicio());
+                bloqueCatalogo.setHoraFin(bGestor.getHoraFin());
+            });
+        }
+    }
+
     private void crearGruposIniciales(ConfiguracionProyecto config) {
         for (int grado = 1; grado <= 3; grado++) {
             int cantidad = config.getCantidadGrupos(grado);
@@ -568,11 +585,13 @@ private void mostrarPlaceholderCrearHorario() {
 
     private JMenuBar crearMenuBar() {
         JMenuBar menuBar = new JMenuBar();
-        menuBar.setBackground(new Color(46, 78, 126));
+        menuBar.setBackground(new Color(30, 50, 90));
         menuBar.setForeground(Color.WHITE);
 
         JMenu menuArchivo = new JMenu("Archivo");
         menuArchivo.setForeground(Color.WHITE);
+        menuArchivo.setBackground(new Color(30, 50, 90));
+        menuArchivo.setOpaque(true);
 
         JMenuItem itemNuevo = new JMenuItem("Nuevo proyecto");
         JMenuItem itemAbrir = new JMenuItem("Abrir");
@@ -606,6 +625,12 @@ private void mostrarPlaceholderCrearHorario() {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Guardar proyecto");
         chooser.setFileFilter(new FileNameExtensionFilter("Archivo de proyecto JSON", "json"));
+        // Proponer nombre preliminar basado en el proyecto
+        String nombreBase = "horario";
+        if (configuracionProyecto != null && configuracionProyecto.getNombreEscuela() != null && !configuracionProyecto.getNombreEscuela().isBlank()) {
+            nombreBase = configuracionProyecto.getNombreEscuela().trim().replaceAll("[^a-zA-Z0-9_-]", "_");
+        }
+        chooser.setSelectedFile(new File(nombreBase + ".json"));
 
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File archivo = chooser.getSelectedFile();
@@ -613,7 +638,10 @@ private void mostrarPlaceholderCrearHorario() {
                 archivo = new File(archivo.getParentFile(), archivo.getName() + ".json");
             }
 
-            ProyectoDatos datos = new ProyectoDatos(configuracionProyecto, catalogo);
+            // Asegurar que las posiciones actuales del gestor se reflejen en el catálogo antes de serializar.
+            sincronizarPosicionesGestorACatalogo();
+
+            ProyectoDatos datos = ProyectoDatos.desdeEstadoActual(configuracionProyecto, catalogo, gestor);
             try {
                 persistenciaController.guardarProyecto(datos, archivo.getAbsolutePath());
                 lblEstado.setText("Estado: Proyecto guardado correctamente.");

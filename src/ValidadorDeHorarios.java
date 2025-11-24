@@ -79,16 +79,29 @@ public class ValidadorDeHorarios {
      * @return true si hay conflicto de tipo ERROR, false en caso contrario.
      */
     public boolean hayConflictoDirecto(BloqueHorario a, BloqueHorario b) {
+        // Si no hay información de día/hora, considerar conflicto potencial cuando comparten recursos,
+        // para que la gráfica incluya la arista y el planificador no solape profesores/salones/grupos.
+        boolean sinTiempo = a.getDia() == null || b.getDia() == null ||
+                a.getHoraInicio() == null || a.getHoraFin() == null ||
+                b.getHoraInicio() == null || b.getHoraFin() == null;
+
+        if (sinTiempo) {
+            if ((a.getProfesorId() != null && a.getProfesorId().equals(b.getProfesorId())) ||
+                (a.getSalonId() != null && a.getSalonId().equals(b.getSalonId())) ||
+                (a.getGrupoId() != null && a.getGrupoId().equals(b.getGrupoId()))) {
+                return true;
+            }
+        }
+
         for (Validador validador : validadoresDeConflicto) {
-            List<ResultadoValidacion> resultados = validador.validar(a, b, null); // Contexto no necesario para construcción de grafo
-            // Comprobamos si hay algún resultado que sea un ERROR.
+            List<ResultadoValidacion> resultados = validador.validar(a, b, null);
             for (ResultadoValidacion resultado : resultados) {
                 if (resultado.getSeveridad() == ResultadoValidacion.Severidad.ERROR) {
-                    return true; // Conflicto de tipo ERROR encontrado.
+                    return true;
                 }
             }
         }
-        return false; // No hay conflictos de tipo ERROR.
+        return false;
     }
 
     /**

@@ -20,7 +20,14 @@ public class ValidadorPorProfesor implements Validador {
             return Collections.emptyList(); // No se puede determinar el conflicto.
         }
 
-        if (a.getProfesorId().equals(b.getProfesorId())) {
+        if (!a.getProfesorId().equals(b.getProfesorId())) {
+            return Collections.emptyList();
+        }
+
+        // Solo hay conflicto si coinciden en día y horario.
+        if (a.getDia() != null && b.getDia() != null &&
+            a.getDia().equalsIgnoreCase(b.getDia()) &&
+            seTraslapan(a, b)) {
             String mensaje = String.format("Mismo profesor (ID: %s)", a.getProfesorId());
             var resultado = new ResultadoValidacion(
                 mensaje, 
@@ -31,5 +38,14 @@ public class ValidadorPorProfesor implements Validador {
         }
 
         return Collections.emptyList(); // No hay conflicto.
+    }
+
+    private boolean seTraslapan(BloqueHorario a, BloqueHorario b) {
+        if (a.getHoraInicio() == null || a.getHoraFin() == null ||
+            b.getHoraInicio() == null || b.getHoraFin() == null) {
+            return false;
+        }
+        return a.getHoraInicio().isBefore(b.getHoraFin()) &&
+               b.getHoraInicio().isBefore(a.getHoraFin());
     }
 }

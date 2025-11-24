@@ -20,9 +20,14 @@ public class ValidadorPorGrupo implements Validador {
             return Collections.emptyList(); // No se puede determinar el conflicto.
         }
 
-        if (a.getGrupoId().equals(b.getGrupoId())) {
+        if (!a.getGrupoId().equals(b.getGrupoId())) {
+            return Collections.emptyList();
+        }
+
+        if (a.getDia() != null && b.getDia() != null &&
+            a.getDia().equalsIgnoreCase(b.getDia()) &&
+            seTraslapan(a, b)) {
             String mensaje = String.format("Mismo grupo (%s)", a.getGrupo());
-            // Incluir los IDs de ambos bloques en el resultado.
             var resultado = new ResultadoValidacion(
                 mensaje, 
                 ResultadoValidacion.Severidad.ERROR,
@@ -32,5 +37,14 @@ public class ValidadorPorGrupo implements Validador {
         }
 
         return Collections.emptyList(); // No hay conflicto.
+    }
+
+    private boolean seTraslapan(BloqueHorario a, BloqueHorario b) {
+        if (a.getHoraInicio() == null || a.getHoraFin() == null ||
+            b.getHoraInicio() == null || b.getHoraFin() == null) {
+            return false;
+        }
+        return a.getHoraInicio().isBefore(b.getHoraFin()) &&
+               b.getHoraInicio().isBefore(a.getHoraFin());
     }
 }
