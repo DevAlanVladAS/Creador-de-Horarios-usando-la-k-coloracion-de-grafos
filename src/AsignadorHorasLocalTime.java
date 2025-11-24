@@ -174,6 +174,11 @@ public class AsignadorHorasLocalTime {
             valido = false;
         }
 
+        // Regla adicional: máximo 2 horas totales al día por materia (no dividir en dos tramos separados)
+        if (valido && excedeMaximoDiarioMateria(bloque, asignados, todosLosBloquesDelDia, dur)) {
+            valido = false;
+        }
+
         for (BloqueHorario other : asignados) {
             if (other == bloque) continue;
             
@@ -252,6 +257,49 @@ public class AsignadorHorasLocalTime {
         }
 
         return false;
+    }
+
+    /**
+     * Verifica que la suma total de horas de la materia en el día no supere 120 minutos,
+     * incluso si estuvieran separadas por huecos.
+     */
+    private boolean excedeMaximoDiarioMateria(BloqueHorario bloque,
+                                              List<BloqueHorario> asignados,
+                                              List<BloqueHorario> todosLosBloquesDelDia,
+                                              Duration durNuevo) {
+        if (bloque.getMateria() == null) {
+            return false;
+        }
+
+        long minutos = durNuevo != null ? durNuevo.toMinutes() : 0;
+
+        // Usar conjunto para evitar contar el mismo bloque dos veces
+        java.util.Set<String> vistos = new java.util.HashSet<>();
+        String idBloque = bloque.getId();
+
+        for (BloqueHorario b : asignados) {
+            if (b == null || b.getId() == null || b.getId().equals(idBloque)) continue;
+            if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                    && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                if (vistos.add(b.getId())) {
+                    minutos += Duration.between(b.getHoraInicio(), b.getHoraFin()).toMinutes();
+                }
+            }
+        }
+        // incluir otros bloques del día ya existentes aunque no estén en asignados, excepto el mismo bloque
+        if (todosLosBloquesDelDia != null) {
+            for (BloqueHorario b : todosLosBloquesDelDia) {
+                if (b == null || b.getId() == null || b.getId().equals(idBloque)) continue;
+                if (bloque.getMateria().equalsIgnoreCase(b.getMateria())
+                        && b.getHoraInicio() != null && b.getHoraFin() != null) {
+                    if (vistos.add(b.getId())) {
+                        minutos += Duration.between(b.getHoraInicio(), b.getHoraFin()).toMinutes();
+                    }
+                }
+            }
+        }
+
+        return minutos > 120;
     }
 
     private LocalTime max(LocalTime a, LocalTime b) {
