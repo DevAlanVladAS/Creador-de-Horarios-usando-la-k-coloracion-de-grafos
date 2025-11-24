@@ -1,43 +1,38 @@
 package src;
 
 import javax.swing.*;
+import java.awt.*;
 import java.awt.dnd.*;
 import java.awt.datatransfer.Transferable;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
-import java.awt.*;
 import java.util.stream.Collectors;
 
 /**
- * Panel que muestra una vista consolidada del horario para todos los grupos de un mismo grado.
- * Genera una cuadrícula con 5 columnas (días) por cada grupo.
- * Ahora implementa Observer para sincronización automática.
+ * Panel que muestra una vista consolidada del horario para todos los grupos de un grado
+ * (grid dias x grupos) y sincroniza cambios con GestorHorarios via observer.
  */
 public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioChangeListener {
 
     private static final DateTimeFormatter HORA_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private final LocalTime[] HORAS_DIA = PlantillaHoraria.BLOQUES_ESTANDAR.toArray(new LocalTime[0]);
-    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
+    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miercoles", "Jueves", "Viernes"};
 
     private final Map<String, CeldaHorarioGrado> celdas = new java.util.HashMap<>();
     private final List<GrupoEstudiantes> grupos;
     private final PanelHorario.PanelSinAsignar panelSinAsignar;
     private final List<String> grupoIds;
     
-    // NUEVO: Referencia al gestor
     private final GestorHorarios gestor;
-    
-    // Flag para evitar refrescos recursivos
     private boolean refrescando = false;
 
     /**
-     * Constructor que recibe la lista de grupos del grado.
+     * Construye el panel recibiendo los grupos de un grado y arma la cuadricula.
      */
     public PanelHorarioGrado(List<GrupoEstudiantes> grupos) {
-        // Ordenar grupos por nombre para visualización consistente
         this.grupos = grupos.stream()
                 .sorted(java.util.Comparator.comparing(GrupoEstudiantes::getNombre))
                 .collect(Collectors.toList());
@@ -50,32 +45,28 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
         
         setLayout(new BorderLayout(10, 10));
 
-        // Panel principal para la cuadrícula
         int numColumnas = 1 + (DIAS_SEMANA.length * this.grupos.size());
         JPanel gridPanel = new JPanel(new GridLayout(0, numColumnas));
         gridPanel.setBackground(Color.WHITE);
 
-        // --- Cabeceras ---
-        gridPanel.add(new JLabel("")); // Esquina superior izquierda
+        // Cabeceras
+        gridPanel.add(new JLabel(""));
 
-        // Fila 1: Cabeceras de Grupos (cada una abarca 5 días)
         for (GrupoEstudiantes grupo : this.grupos) {
             gridPanel.add(crearCabeceraGrupoPrincipal(grupo.toString()));
-            // Relleno para simular colspan
             for (int i = 0; i < DIAS_SEMANA.length-1; i++) {
                 gridPanel.add(new JLabel(""));
             }
         }
 
-        // Fila 2: Sub-cabeceras de DÃƒÂ­as
-        gridPanel.add(new JLabel("")); // Columna de horas
+        gridPanel.add(new JLabel(""));
         for (GrupoEstudiantes grupo : this.grupos) {
             for(String dia : DIAS_SEMANA) {
                 gridPanel.add(crearCabeceraDia(dia));
             }
         }
 
-        // --- Contenido de la cuadrícula ---
+        // Contenido de la cuadrícula
         DropTargetListener dropListener = crearDropTargetListener();
         for (LocalTime hora : HORAS_DIA) {
             gridPanel.add(crearCabeceraHora(formatearHora(hora)));
@@ -90,7 +81,6 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
             }
         }
 
-        // Panel de bloques sin asignar
         panelSinAsignar = PanelHorario.crearPanelSinAsignar();
 
         JScrollPane scrollSinAsignar = new JScrollPane(panelSinAsignar);
@@ -104,35 +94,33 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
         add(new JScrollPane(gridPanel), BorderLayout.CENTER);
         add(contenedorSinAsignar, BorderLayout.EAST);
         
-        // IMPORTANTE: Registrarse como listener DESPUÉS de construir la UI
         gestor.addListener(this);
         
-        // Cargar datos iniciales
         refrescarVista();
     }
 
+    /**
+     * Grupos del grado (defensivo).
+     */
     public List<GrupoEstudiantes> getGrupos() {
         return new ArrayList<>(grupos);
     }
 
-    // ========== IMPLEMENTACIÃƒâ€œN DEL OBSERVER ==========
+    // ========== OBSERVER ==========
 
     /**
-     * Callback del Observer: se invoca cuando cambian los bloques.
+     * Callback de cambios en bloques; refresca si afecta a nuestros grupos.
      */
     @Override
     public void onBloquesChanged(String grupoIdAfectado, GestorHorarios.TipoCambio tipoCambio, 
                                 BloqueHorario bloqueAfectado) {
-        // Refrescar si:
-        // 1. Es un cambio global (grupoIdAfectado == null)
-        // 2. El grupo afectado está en nuestra lista de grupos
         if (grupoIdAfectado == null || grupoIds.contains(grupoIdAfectado)) {
             SwingUtilities.invokeLater(this::refrescarVista);
         }
     }
 
     /**
-     * Refresca toda la vista obteniendo datos del gestor.
+     * Refresca la vista completa leyendo del gestor.
      */
     private void refrescarVista() {
         if (refrescando) return;
@@ -140,14 +128,11 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
         try {
             refrescando = true;
             
-            // Limpiar celdas y panel sin asignar
             celdas.values().forEach(CeldaHorarioGrado::reset);
             panelSinAsignar.resetContenido();
 
-            // Obtener bloques de todos los grupos del grado
             List<BloqueHorario> todosBloques = gestor.getBloquesGrado(grupoIds);
 
-            // Colocar bloques en las celdas correspondientes
             for (BloqueHorario bloque : todosBloques) {
                 LocalTime horaInicio = bloque.getHoraInicio();
                 LocalTime horaNormalizada = horaInicio != null ? 
@@ -164,7 +149,6 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
                     }
                 }
                 
-                // Si no se pudo colocar, va a sin asignar
                 panelSinAsignar.addBloquePanel(new BloquePanel(bloque));
             }
             
@@ -178,30 +162,24 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
     }
 
     /**
-     * Método público para cargar bloques (compatible con código legacy).
-     * Ahora delega al gestor.
+     * Carga bloques (compatibilidad legacy) delegando al gestor.
      */
     public void cargarBloques(List<BloqueHorario> bloques) {
-        // Agrupar bloques por grupo
         Map<String, List<BloqueHorario>> bloquesPorGrupo = bloques.stream()
             .collect(Collectors.groupingBy(BloqueHorario::getGrupoId));
         
-        // Para cada grupo, actualizar su horario en el gestor
         for (String grupoId : grupoIds) {
             HorarioSemana semana = gestor.getHorarioSemana(grupoId);
             
-            // Limpiar bloques existentes de este grupo
             List<BloqueHorario> bloquesExistentes = new ArrayList<>(semana.getBloques());
             for (BloqueHorario bloqueExistente : bloquesExistentes) {
                 semana.eliminarBloque(bloqueExistente.getId());
             }
             
-            // Agregar nuevos bloques de este grupo
             List<BloqueHorario> bloquesGrupo = bloquesPorGrupo.getOrDefault(grupoId, new ArrayList<>());
             for (BloqueHorario bloque : bloquesGrupo) {
                 gestor.agregarBloque(bloque, grupoId);
                 
-                // Si el bloque ya tiene posiciÃƒÂ³n, asignarlo
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
                     gestor.actualizarPosicionBloque(bloque, 
                         bloque.getDia(), 
@@ -210,17 +188,17 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
             }
         }
         
-        // El refresco se hará automáticamente ví­a Observer
+        // El observer refrescara la vista
     }
 
     /**
-     * Obtiene todos los bloques actuales (para persistencia).
+     * Obtiene todos los bloques actuales del grado (para persistencia).
      */
     public List<BloqueHorario> obtenerTodosLosBloques() {
         return gestor.getBloquesGrado(grupoIds);
     }
 
-    // ========== COMPONENTES GRÁFICOS ==========
+    // ========== COMPONENTES GRAFICOS ==========
 
     private JLabel crearCabeceraGrupoPrincipal(String texto) {
         JLabel label = new JLabel(texto, SwingConstants.CENTER);
@@ -307,13 +285,12 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
                     BloqueHorario bloqueTransferido = (BloqueHorario) 
                         tr.getTransferData(BloquePanel.DATA_FLAVOR);
 
-                    // Validar que el bloque pertenece a este grupo
                     if (!bloqueTransferido.getGrupoId().equals(celda.getGrupoId())) {
                         dtde.rejectDrop();
                         JOptionPane.showMessageDialog(PanelHorarioGrado.this,
                             "Este bloque pertenece al grupo " + bloqueTransferido.getGrupoId() + 
                             " y no puede ser colocado en el grupo " + celda.getGrupoId(),
-                            "Error de asignaciÃƒÂ³n",
+                            "Error de asignacion",
                             JOptionPane.ERROR_MESSAGE);
                         return;
                     }
@@ -321,7 +298,6 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
                     dtde.acceptDrop(DnDConstants.ACTION_MOVE);
                     aceptado = true;
                     
-                    // CRÍTICO: Usar el gestor para actualizar la posición
                     gestor.actualizarPosicionBloque(bloqueTransferido, celda.getDia(), celda.getHora());
                     
                     dtde.dropComplete(true);
@@ -343,7 +319,7 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
     // ========== CELDA ESPECIALIZADA ==========
 
     /**
-     * Celda especializada para el horario de grado, que también conoce el ID del grupo.
+     * Celda especializada para la vista de grado (incluye id de grupo).
      */
     public class CeldaHorarioGrado extends PanelHorario.CeldaHorario {
         private final String grupoId;
@@ -367,11 +343,10 @@ public class PanelHorarioGrado extends JPanel implements GestorHorarios.HorarioC
 
         @Override
         public void colocarBloque(BloquePanel panel) {
-            // Validar que el bloque pertenece a este grupo
             if (!panel.getBloque().getGrupoId().equals(this.grupoId)) {
                 JOptionPane.showMessageDialog(this,
-                    "Este bloque pertenece a otro grupo y no puede ser colocado aquí.",
-                    "Error de asignación",
+                    "Este bloque pertenece a otro grupo y no puede ser colocado aqui.",
+                    "Error de asignacion",
                     JOptionPane.ERROR_MESSAGE);
                 return;
             }

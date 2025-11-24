@@ -17,7 +17,7 @@ public class PanelConfiguracion extends JPanel implements GestorHorarios.Horario
     private final GestorHorarios gestorHorarios = GestorHorarios.getInstance();
    
     private final boolean permitirAsignaciones;
-    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes"};
+    private final String[] DIAS_SEMANA = {"Lunes", "Martes", "Miercoles", "Jueves", "Viernes"};
     private final String[] HORAS_CLASE = {"7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00"};
 
     private JTable tablaProfesores;

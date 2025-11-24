@@ -1,20 +1,23 @@
 package src;
+
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 
 /**
- * Panel que muestra notificaciones al usuario en tiempo real.
- * Cambia de color según el tipo de mensaje (éxito o error).
+ * Panel que muestra notificaciones en tiempo real y ajusta color segun severidad.
  */
 public class PanelNotificaciones extends JPanel {
 
     private JLabel etiquetaNotificacion;
-    private static final Color COLOR_EXITO = new Color(34, 139, 34); // ForestGreen
-    private static final Color COLOR_ADVERTENCIA = new Color(255, 165, 0); // Orange
+    private static final Color COLOR_EXITO = new Color(34, 139, 34);
+    private static final Color COLOR_ADVERTENCIA = new Color(255, 165, 0);
     private static final Color COLOR_ERROR = new Color(220, 53, 69);
     private static final Color COLOR_NEUTRO = Color.BLACK;
 
+    /**
+     * Crea el panel con estilo base.
+     */
     public PanelNotificaciones() {
         setLayout(new BorderLayout());
         etiquetaNotificacion = new JLabel("Listo.", SwingConstants.LEFT);
@@ -25,8 +28,7 @@ public class PanelNotificaciones extends JPanel {
     }
 
     /**
-     * Muestra una notificación simple con un color neutro.
-     * @param mensaje El mensaje a mostrar.
+     * Muestra una notificacion simple en color neutro.
      */
     public void mostrarNotificacion(String mensaje) {
         setBackground(COLOR_NEUTRO);
@@ -34,13 +36,12 @@ public class PanelNotificaciones extends JPanel {
     }
 
     /**
-     * Procesa y muestra una lista de resultados de validación.
-     * @param resultados La lista de resultados proveniente del validador.
+     * Procesa y muestra resultados de validacion, coloreando segun severidad.
      */
     public void mostrarResultados(List<ResultadoValidacion> resultados) {
         if (resultados == null || resultados.isEmpty()) {
             setBackground(COLOR_NEUTRO);
-            etiquetaNotificacion.setText("Validación no produjo resultados.");
+            etiquetaNotificacion.setText("Validacion no produjo resultados.");
             return;
         }
 
@@ -49,18 +50,17 @@ public class PanelNotificaciones extends JPanel {
 
         if (errores > 0) {
             setBackground(COLOR_ERROR);
-            etiquetaNotificacion.setText(String.format("Validación: %d Error(es) y %d Advertencia(s) encontradas.", errores, advertencias));
+            etiquetaNotificacion.setText(String.format("Validacion: %d Error(es) y %d Advertencia(s) encontradas.", errores, advertencias));
         } else if (advertencias > 0) {
             setBackground(COLOR_ADVERTENCIA);
-            etiquetaNotificacion.setText(String.format("Validación: %d Advertencia(s) encontradas.", advertencias));
+            etiquetaNotificacion.setText(String.format("Validacion: %d Advertencia(s) encontradas.", advertencias));
         } else {
             setBackground(COLOR_EXITO);
-            // Busca el primer resultado que no tenga severidad (mensaje de éxito)
             String mensajeExito = resultados.stream()
                 .filter(r -> r.getSeveridad() == null)
                 .map(ResultadoValidacion::getMensaje)
                 .findFirst()
-                .orElse("Validación completada sin conflictos.");
+                .orElse("Validacion completada sin conflictos.");
             etiquetaNotificacion.setText(mensajeExito);
         }
     }

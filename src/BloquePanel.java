@@ -1,4 +1,5 @@
 package src;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
@@ -13,8 +14,11 @@ import java.awt.dnd.DragSourceEvent;
 import java.awt.dnd.DragSourceListener;
 import java.util.HashMap;
 import java.util.Map;
-import java.awt.Cursor;
 
+/**
+ * Panel visual que renderiza un BloqueHorario y permite arrastrarlo (drag & drop)
+ * dentro del calendario. Gestiona color, contenido y estado de union visual.
+ */
 public class BloquePanel extends JPanel implements Transferable, DragGestureListener, DragSourceListener {
 
     public static final DataFlavor DATA_FLAVOR = new DataFlavor(BloqueHorario.class, "BloqueHorario");
@@ -38,10 +42,16 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
     private boolean mergeTop;
     private boolean mergeBottom;
 
+    /**
+     * Crea un panel arrastrable para el bloque dado.
+     */
     public BloquePanel(BloqueHorario bloque) {
         this(bloque, true);
     }
 
+    /**
+     * Crea el panel con opcion de habilitar/inhabilitar arrastre.
+     */
     public BloquePanel(BloqueHorario bloque, boolean habilitarArrastre) {
         this.bloque = bloque;
         this.arrastrable = habilitarArrastre;
@@ -91,6 +101,9 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         }
     }
 
+    /**
+     * Asigna un color para el bloque segun el profesor (persistente por profesor).
+     */
     private Color asignarColor(String profesorId) {
         if (profesorId == null) {
             return new Color(120, 120, 120);
@@ -98,6 +111,9 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         return COLORES_POR_PROFESOR.computeIfAbsent(profesorId, id -> seleccionarColorDisponible());
     }
 
+    /**
+     * Selecciona el siguiente color disponible de la paleta evitando el de cabecera.
+     */
     private Color seleccionarColorDisponible() {
         int offset = COLORES_POR_PROFESOR.size();
         for (int i = 0; i < PALETA.length; i++) {
@@ -109,22 +125,34 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
         return COLOR_CABECERA_DIA.brighter();
     }
 
+    /**
+     * Indica si el color coincide con el usado en la cabecera de dia.
+     */
     private boolean esColorCabecera(Color color) {
         return color.getRed() == COLOR_CABECERA_DIA.getRed()
                 && color.getGreen() == COLOR_CABECERA_DIA.getGreen()
                 && color.getBlue() == COLOR_CABECERA_DIA.getBlue();
     }
 
+    /**
+     * Devuelve el bloque representado por este panel.
+     */
     public BloqueHorario getBloque() {
         return bloque;
     }
 
+    /**
+     * Define el estado de union visual (arriba/abajo) para bloques consecutivos.
+     */
     public void setMergeState(boolean mergeTop, boolean mergeBottom) {
         this.mergeTop = mergeTop;
         this.mergeBottom = mergeBottom;
         repaint();
     }
 
+    /**
+     * Resetea el estado de union visual.
+     */
     public void resetMergeState() {
         setMergeState(false, false);
     }
@@ -151,11 +179,10 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
 
     @Override
     public void dragGestureRecognized(DragGestureEvent dge) {
-        // Iniciar el arrastre y registrar ESTE panel como el listener de la fuente.
         dge.startDrag(DragSource.DefaultMoveDrop, this, this);
     }
 
-    // --- Métodos de DragSourceListener ---
+    // --- Metodos de DragSourceListener ---
 
     @Override
     public void dragEnter(DragSourceDragEvent dsde) {}
@@ -171,8 +198,6 @@ public class BloquePanel extends JPanel implements Transferable, DragGestureList
 
     @Override
     public void dragDropEnd(DragSourceDropEvent dsde) {
-        // Este método se llama cuando el drop se completa.
-        // Si el drop fue exitoso, eliminamos el panel original de su contenedor.
         if (dsde.getDropSuccess()) {
             Container parent = getParent();
             if (parent != null) {

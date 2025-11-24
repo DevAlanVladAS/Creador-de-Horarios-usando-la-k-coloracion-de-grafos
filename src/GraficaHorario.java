@@ -1,10 +1,11 @@
 package src;
+
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Interfaz que define operaciones básicas para una gráfica de conflictos de horarios.
- * Nodos representan bloques (por id), aristas representan conflictos.
+ * Interfaz para la grafica de conflictos de horarios:
+ * nodos son bloques y aristas representan incompatibilidades.
  */
 public interface GraficaHorario {
     /**
@@ -22,13 +23,12 @@ public interface GraficaHorario {
     void agregarArista(String bloqueIdA, String bloqueIdB);
 
     /**
-     * Muestra la gráfica en consola (útil para debugging).
+     * Muestra la grafica en consola (util para debugging).
      */
     void mostrar();
 
     /**
-     * Obtiene el mapa de adyacencias (id -> set de ids conflictivos).
-     * Util para algoritmos de coloracion y backtracking.
+     * Mapa de adyacencias (id -> set de ids conflictivos).
      */
     Map<String, Set<String>> obtenerAdyacencias();
 
@@ -38,12 +38,12 @@ public interface GraficaHorario {
     BloqueHorario obtenerBloque(String id);
 
     /**
-     * Obtiene el numero total de nodos.
+     * Numero total de nodos.
      */
     int obtenerNumeroNodos();
 
     /**
-     * Obtiene el numero total de aristas.
+     * Numero total de aristas.
      */
     int obtenerNumeroAristas();
 }

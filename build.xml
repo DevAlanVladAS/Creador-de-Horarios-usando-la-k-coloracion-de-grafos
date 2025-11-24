@@ -54,8 +54,7 @@
                destdir="${build.classes.dir}"
                includeantruntime="false"
                encoding="UTF-8"
-               source="11"
-               target="11">
+               release="17">
             <classpath refid="compile.classpath"/>
             <include name="*.java"/>
             <exclude name="**/test/**"/>
@@ -68,8 +67,7 @@
                destdir="${build.test.classes.dir}"
                includeantruntime="false"
                encoding="UTF-8"
-               source="11"
-               target="11">
+               release="17">
             <classpath refid="test.classpath"/>
         </javac>
     </target>

@@ -4,7 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Formulario que recopila los datos iniciales del proyecto escolar.
+ * Formulario Swing para capturar nombre de escuela y cantidad de grupos por grado,
+ * con acceso a gestion de recursos.
  */
 public class PanelConfiguracionProyecto extends JPanel {
 
@@ -12,6 +13,9 @@ public class PanelConfiguracionProyecto extends JPanel {
     private final JSpinner[] spinnersGrado = new JSpinner[3];
     private final JButton btnGestionarRecursos = new JButton("Gestionar recursos...");
 
+    /**
+     * Construye el panel y arma el formulario de configuracion inicial.
+     */
     public PanelConfiguracionProyecto() {
         setLayout(new BorderLayout(15, 15));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -64,6 +68,9 @@ public class PanelConfiguracionProyecto extends JPanel {
         return spinner;
     }
 
+    /**
+     * Carga en el formulario una configuracion existente.
+     */
     public void setConfiguracion(ConfiguracionProyecto configuracion) {
         if (configuracion == null) {
             return;
@@ -83,6 +90,9 @@ public class PanelConfiguracionProyecto extends JPanel {
         return configuracion;
     }
 
+    /**
+     * Registra listener para el boton "Gestionar recursos...".
+     */
     public void addGestionarRecursosListener(java.awt.event.ActionListener listener) {
         btnGestionarRecursos.addActionListener(listener);
     }

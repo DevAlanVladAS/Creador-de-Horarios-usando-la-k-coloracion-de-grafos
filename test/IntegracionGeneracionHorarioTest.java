@@ -1,5 +1,7 @@
 package test;
 
+import org.junit.Before;
+import org.junit.Test;
 import src.AdaptadorGraficaDeHorarios;
 import src.BloqueHorario;
 import src.CatalogoRecursos;
@@ -9,18 +11,15 @@ import src.GrupoEstudiantes;
 import src.HorarioSemana;
 import src.Profesor;
 import src.Salon;
-import src.Validador;
 import src.ValidadorPorProfesor;
 import src.ValidadorPorSalon;
-
-import org.junit.Before;
-import org.junit.Test;
-import static org.junit.Assert.*;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.junit.Assert.*;
 
 public class IntegracionGeneracionHorarioTest {
     private CatalogoRecursos catalogo;
@@ -46,15 +45,12 @@ public class IntegracionGeneracionHorarioTest {
 
         // 3. Validar el resultado
         assertNotNull(horario);
-        // Comprobar que todos los bloques fueron asignados (en un caso ideal)
-        assertEquals("Todos los bloques deberían haber sido asignados", bloques.size(), horario.getBloques().size());
+        assertEquals("Todos los bloques deberían estar presentes", bloques.size(), horario.getBloques().size());
         assertTrue("No debería haber bloques sin asignar", horario.getBloquesSinAsignar().isEmpty());
 
         // 4. Validar que no hay conflictos en el horario generado
-        List<Validador> validadores = Arrays.asList(
-            new ValidadorPorProfesor(catalogo),
-            new ValidadorPorSalon(catalogo)
-        );
+        ValidadorPorProfesor validadorProfesor = new ValidadorPorProfesor();
+        ValidadorPorSalon validadorSalon = new ValidadorPorSalon();
 
         List<BloqueHorario> bloquesAsignados = horario.getBloques();
         boolean hayConflictos = false;
@@ -64,16 +60,13 @@ public class IntegracionGeneracionHorarioTest {
                 BloqueHorario b1 = bloquesAsignados.get(i);
                 BloqueHorario b2 = bloquesAsignados.get(j);
 
-                // Solo validar si están en el mismo día
                 if (b1.getDia() != null && b1.getDia().equals(b2.getDia())) {
-                    for (Validador v : validadores) {
-                        if (!v.esValido(b1, b2)) {
-                            System.out.println("Conflicto detectado: " + v.getTipoConflicto());
-                            System.out.println("Bloque 1: " + b1.getMateria() + " en " + b1.getDia() + " " + b1.getHoraInicio());
-                            System.out.println("Bloque 2: " + b2.getMateria() + " en " + b2.getDia() + " " + b2.getHoraInicio());
-                            hayConflictos = true;
-                            break;
-                        }
+                    boolean conflicto =
+                        !validadorProfesor.validar(b1, b2, horario).isEmpty() ||
+                        !validadorSalon.validar(b1, b2, horario).isEmpty();
+                    if (conflicto) {
+                        hayConflictos = true;
+                        break;
                     }
                 }
             }
@@ -85,14 +78,13 @@ public class IntegracionGeneracionHorarioTest {
 
     private void crearRecursosEnCatalogo(CatalogoRecursos cat) {
         List<String> todosLosDias = Arrays.asList("Lunes", "Martes", "Miercoles", "Jueves", "Viernes");
-        // Correccion: El último parámetro debe ser una lista de horas, no de días. Asi ya jala bien =)
         List<String> todasLasHoras = Arrays.asList("08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00");
         cat.addProfesor(new Profesor("Prof A", "Matematicas", todosLosDias, todasLasHoras));
         cat.addProfesor(new Profesor("Prof B", "Ciencias", todosLosDias, todasLasHoras));
         cat.addSalon(new Salon("Salon 101", 0));
         cat.addSalon(new Salon("Salon 102", 0));
-        cat.addGrupo(new GrupoEstudiantes("Grupo 1"));
-        cat.addGrupo(new GrupoEstudiantes("Grupo 2"));
+        cat.addGrupo(new GrupoEstudiantes("Grupo 1", 0));
+        cat.addGrupo(new GrupoEstudiantes("Grupo 2", 0));
     }
 
     private List<BloqueHorario> crearBloques(CatalogoRecursos cat) {

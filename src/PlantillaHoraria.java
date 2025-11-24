@@ -4,7 +4,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * Define la plantilla estándar de bloques académicos que se usa en toda la aplicación.
+ * Define la plantilla estandar de bloques academicos utilizada por la aplicacion.
  */
 public final class PlantillaHoraria {
 
