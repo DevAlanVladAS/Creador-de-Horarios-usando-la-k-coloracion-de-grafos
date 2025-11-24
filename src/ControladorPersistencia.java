@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Controlador responsable de guardar y cargar los horarios desde archivos.
- * Serializa el contenido en un JSON sencillo para facilitar el intercambio de datos.
+ * Controla la persistencia de horarios y proyectos en disco
+ * (serializacion sencilla a JSON).
  */
 public class ControladorPersistencia {
 
@@ -21,14 +21,14 @@ public class ControladorPersistencia {
             Paths.get(System.getProperty("user.dir"), "horario_guardado.json");
 
     /**
-     * Guarda el horario en un archivo JSON dentro del directorio del usuario.
+     * Guarda un horario en la ruta por defecto.
      */
     public void guardar(HorarioSemana horario) {
         guardar(horario, ARCHIVO_POR_DEFECTO);
     }
 
     /**
-     * Guarda el horario en el archivo indicado.
+     * Guarda un horario en la ruta especificada, creando directorios si es necesario.
      */
     public void guardar(HorarioSemana horario, Path destino) {
         if (horario == null) {
@@ -48,15 +48,15 @@ public class ControladorPersistencia {
     }
 
     /**
-     * Carga un horario desde la ruta indicada.
+     * Carga un horario desde un archivo.
      */
     public HorarioSemana cargarHorario(String ruta) {
         if (ruta == null || ruta.isBlank()) {
-            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
+            throw new IllegalArgumentException("Debe proporcionar una ruta valida");
         }
         Path origen = Paths.get(ruta);
         if (!Files.exists(origen)) {
-            throw new IllegalArgumentException("No se encontró el archivo: " + ruta);
+            throw new IllegalArgumentException("No se encontro el archivo: " + ruta);
         }
         try {
             String data = Files.readString(origen, StandardCharsets.UTF_8);
@@ -66,12 +66,15 @@ public class ControladorPersistencia {
         }
     }
 
+    /**
+     * Guarda los datos completos de proyecto (JSON) en la ruta indicada.
+     */
     public void guardarProyecto(ProyectoDatos datos, String ruta) throws IOException {
         if (datos == null) {
             throw new IllegalArgumentException("No hay datos de proyecto para guardar");
         }
         if (ruta == null || ruta.isBlank()) {
-            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
+            throw new IllegalArgumentException("Debe proporcionar una ruta valida");
         }
         Path destino = Paths.get(ruta);
         Path parent = destino.getParent();
@@ -81,18 +84,24 @@ public class ControladorPersistencia {
         Files.writeString(destino, datos.toJson(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * Carga un proyecto desde JSON en disco.
+     */
     public ProyectoDatos cargarProyecto(String ruta) throws IOException {
         if (ruta == null || ruta.isBlank()) {
-            throw new IllegalArgumentException("Debe proporcionar una ruta válida");
+            throw new IllegalArgumentException("Debe proporcionar una ruta valida");
         }
         Path origen = Paths.get(ruta);
         if (!Files.exists(origen)) {
-            throw new IllegalArgumentException("No se encontró el archivo: " + ruta);
+            throw new IllegalArgumentException("No se encontro el archivo: " + ruta);
         }
         String contenido = Files.readString(origen, StandardCharsets.UTF_8);
         return ProyectoDatos.fromJson(contenido);
     }
 
+    /**
+     * Serializa un HorarioSemana a un JSON simple.
+     */
     private String serializarHorario(HorarioSemana horario) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"bloques\":[");
@@ -120,6 +129,9 @@ public class ControladorPersistencia {
         return sb.toString();
     }
 
+    /**
+     * Deserializa un JSON simple a HorarioSemana.
+     */
     private HorarioSemana deserializarHorario(String json) {
         HorarioSemana horario = new HorarioSemana();
         Map<String, HorarioDia> diasCreados = new HashMap<>();
@@ -214,7 +226,7 @@ public class ControladorPersistencia {
             }
             String valor;
             if (i < contenido.length() && contenido.charAt(i) == '"') {
-                i++; // omite comilla inicial
+                i++; 
                 StringBuilder sb = new StringBuilder();
                 boolean escapar = false;
                 while (i < contenido.length()) {
@@ -232,7 +244,7 @@ public class ControladorPersistencia {
                     i++;
                 }
                 valor = unescape(sb.toString());
-                i++; // omite comilla de cierre
+                i++; 
             } else {
                 int finValor = i;
                 while (finValor < contenido.length() && contenido.charAt(finValor) != ',') {

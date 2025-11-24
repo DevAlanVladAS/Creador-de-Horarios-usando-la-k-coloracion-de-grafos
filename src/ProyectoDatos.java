@@ -44,6 +44,7 @@ public class ProyectoDatos {
         return new ProyectoDatos(configuracion, catalogo);
     }
 
+    /** Construye el snapshot copiando el estado del catalogo. */
     public ProyectoDatos(ConfiguracionProyecto configuracionOriginal, CatalogoRecursos catalogo) {
         if (catalogo == null) {
             throw new IllegalArgumentException("El catÃ¡logo no puede ser nulo");
@@ -77,6 +78,9 @@ public class ProyectoDatos {
         this.asignacionBloques = asignacionBloques;
     }
 
+    /**
+     * Restaura el estado del proyecto en la interfaz y el catalogo dados.
+     */
     public void restaurarEn(InterfazGrafica interfaz, CatalogoRecursos catalogo) {
         if (interfaz == null || catalogo == null) {
             throw new IllegalArgumentException("Interfaz y catÃ¡logo son obligatorios");
@@ -102,6 +106,7 @@ public class ProyectoDatos {
         interfaz.recargarDesdeCatalogo();
     }
 
+    /** Serializa el snapshot a un JSON plano. */
     public String toJson() {
         StringBuilder sb = new StringBuilder();
         Map<String, String> bloqueAsignacion = crearMapaBloqueAsignacion(asignacionBloques);
@@ -118,6 +123,7 @@ public class ProyectoDatos {
         return sb.toString();
     }
 
+    /** Deserializa un JSON plano y reconstruye el snapshot. */
     public static ProyectoDatos fromJson(String json) {
         SimpleJsonParser parser = new SimpleJsonParser(json);
         Object rootObj = parser.parse();

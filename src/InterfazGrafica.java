@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import javax.imageio.ImageIO;
 
+/**
+ * Ventana principal de la aplicacion: orquesta la UI Swing para generar, validar,
+ * exportar y gestionar horarios, escuchando cambios del GestorHorarios.
+ */
 public class InterfazGrafica extends JFrame implements GestorHorarios.ValidationListener {
 
     private JTabbedPane tabbedPanelHorarios;

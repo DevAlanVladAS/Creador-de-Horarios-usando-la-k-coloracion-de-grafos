@@ -1,7 +1,11 @@
-
 package src;
+
 import java.util.*;
 
+/**
+ * Adapta la lista de bloques a una grafica de conflictos (nodos y aristas)
+ * para que los algoritmos de coloracion puedan detectar incompatibilidades.
+ */
 public class AdaptadorGraficaDeHorarios implements GraficaHorario {
 
     private final Map<String, BloqueHorario> nodos;
@@ -10,6 +14,9 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     private final ValidadorDeHorarios validador;
     private int numAristas;
 
+    /**
+     * Crea una grafica vacia vinculada a un catalogo.
+     */
     public AdaptadorGraficaDeHorarios(CatalogoRecursos catalogo) {
         this.catalogo = catalogo;
         this.nodos = new HashMap<>();
@@ -18,6 +25,9 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         this.validador = new ValidadorDeHorarios();
     }
 
+    /**
+     * Crea la grafica inicializando todos los nodos con los bloques recibidos.
+     */
     public AdaptadorGraficaDeHorarios(List<BloqueHorario> bloques, CatalogoRecursos catalogo) {
         this.catalogo = catalogo;
         this.nodos = new HashMap<>();
@@ -25,12 +35,14 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         this.numAristas = 0;
         this.validador = new ValidadorDeHorarios();
 
-        // Agregar todos los bloques como nodos
         for (BloqueHorario bloque : bloques) {
             agregarNodo(bloque.getId(), bloque);
         }
     }
 
+    /**
+     * Registra un bloque como nodo de la grafica si aun no existe.
+     */
     @Override
     public void agregarNodo(String bloqueId, BloqueHorario bloque) {
         if (!nodos.containsKey(bloqueId)) {
@@ -39,10 +51,14 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         }
     }
 
+    /**
+     * Conecta dos nodos mediante una arista no dirigida.
+     * @throws IllegalArgumentException si alguno de los nodos no existe.
+     */
     @Override
     public void agregarArista(String bloqueIdA, String bloqueIdB) {
         if (!nodos.containsKey(bloqueIdA) || !nodos.containsKey(bloqueIdB)) {
-            throw new IllegalArgumentException("Uno o ambos bloques no existen en la gráfica");
+            throw new IllegalArgumentException("Uno o ambos bloques no existen en la grafica");
         }
 
         if (!adyacencias.get(bloqueIdA).contains(bloqueIdB)) {
@@ -53,11 +69,8 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     }
 
     /**
-     * Construye las aristas automáticamente basándose en conflictos entre bloques.
-     * Dos bloques tienen conflicto si:
-     * - Comparten el mismo profesor y sus horarios se solapan
-     * - Comparten el mismo salón y sus horarios se solapan
-     * - Comparten el mismo grupo y sus horarios se solapan
+     * Genera aristas automaticamente entre bloques que entran en conflicto
+     * (mismo profesor, salon o grupo con solapamiento de horario).
      */
     public void construirGraficaAutomaticamente() {
         List<String> ids = new ArrayList<>(nodos.keySet());
@@ -77,37 +90,41 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         }
     }
 
+    /**
+     * Determina si dos bloques tienen conflicto por tiempo y recursos.
+     */
     private boolean hayConflicto(BloqueHorario a, BloqueHorario b) {
-        // Lógica de solapamiento de tiempo.
         boolean seSolapanEnTiempo;
-        if (a.getHoraInicio() == null || a.getHoraFin() == null || b.getHoraInicio() == null || b.getHoraFin() == null) {
-            // Si las horas no están definidas, se asume que hay un posible conflicto de tiempo
-            // para que se evalúen los recursos. Esto es crucial para la fase de coloración
-            // antes de la asignación de horas.
+        if (a.getHoraInicio() == null || a.getHoraFin() == null ||
+            b.getHoraInicio() == null || b.getHoraFin() == null) {
+            // Con horas indefinidas asumimos posible conflicto para que se coloree separado.
             seSolapanEnTiempo = true;
         } else {
-            // Lógica de solapamiento: A empieza antes de que B termine Y B empieza antes de que A termine.
-            seSolapanEnTiempo = a.getHoraInicio().isBefore(b.getHoraFin()) && b.getHoraInicio().isBefore(a.getHoraFin());
+            seSolapanEnTiempo = a.getHoraInicio().isBefore(b.getHoraFin()) &&
+                                b.getHoraInicio().isBefore(a.getHoraFin());
         }
 
-        // Si no se solapan en tiempo, no puede haber conflicto.
         if (!seSolapanEnTiempo) {
             return false;
         }
 
-        // Si se solapan, delegar la validación de recursos al motor centralizado.
-        // Esto incluye validación de Profesor, Salón y Grupo.
         return validador.hayConflictoDirecto(a, b);
     }
 
+    /**
+     * Indica si dos nodos son vecinos en la grafica.
+     */
     public boolean sonAdyacentes(String bloqueIdA, String bloqueIdB) {
         return adyacencias.containsKey(bloqueIdA) &&
-                adyacencias.get(bloqueIdA).contains(bloqueIdB);
+               adyacencias.get(bloqueIdA).contains(bloqueIdB);
     }
 
+    /**
+     * Muestra en consola un resumen de nodos y conflictos.
+     */
     @Override
     public void mostrar() {
-        System.out.println("=== Gráfica de Conflictos ===");
+        System.out.println("=== Grafica de Conflictos ===");
         System.out.println("Nodos: " + nodos.size());
         System.out.println("Aristas: " + numAristas);
         System.out.println("\nAdyacencias:");
@@ -123,41 +140,57 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         }
     }
 
+    /**
+     * Devuelve una copia del mapa de adyacencias.
+     */
     @Override
     public Map<String, Set<String>> obtenerAdyacencias() {
         return new HashMap<>(adyacencias);
     }
 
+    /**
+     * Obtiene el bloque asociado a un id de nodo.
+     */
     @Override
     public BloqueHorario obtenerBloque(String id) {
         return nodos.get(id);
     }
 
+    /**
+     * Numero total de nodos.
+     */
     @Override
     public int obtenerNumeroNodos() {
         return nodos.size();
     }
 
+    /**
+     * Numero total de aristas.
+     */
     @Override
     public int obtenerNumeroAristas() {
         return numAristas;
     }
 
+    /**
+     * Lista de todos los bloques almacenados como nodos.
+     */
     public List<BloqueHorario> obtenerTodosLosBloques() {
         return new ArrayList<>(nodos.values());
     }
 
+    /**
+     * Calcula estadisticas basicas (grado promedio y densidad).
+     */
     public Map<String, Double> obtenerEstadisticas() {
         Map<String, Double> stats = new HashMap<>();
 
-        // Calcular grado promedio
         double gradoTotal = 0;
         for (Set<String> vecinos : adyacencias.values()) {
             gradoTotal += vecinos.size();
         }
         double gradoPromedio = nodos.isEmpty() ? 0 : gradoTotal / nodos.size();
 
-        // Calcular densidad
         int n = nodos.size();
         double maxAristas = n * (n - 1) / 2.0;
         double densidad = maxAristas == 0 ? 0 : numAristas / maxAristas;
@@ -168,17 +201,22 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         return stats;
     }
 
+    /**
+     * Devuelve el catalogo de recursos.
+     */
     public CatalogoRecursos getCatalogo() {
         return catalogo;
     }
 
+    /**
+     * Devuelve el validador central usado para evaluar conflictos.
+     */
     public ValidadorDeHorarios getValidador() {
         return validador;
     }
 
     /**
-     * Aplica k-coloración usando algoritmo greedy (DSatur simplificado).
-     * Retorna un arreglo donde el índice corresponde al bloque y el valor es el color (día).
+     * Aplica una coloracion greedy (DSatur simplificado) y asigna un color por nodo.
      */
     public Map<String, Integer> colorear() {
         Map<String, Integer> colores = new HashMap<>();
@@ -188,21 +226,17 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
             return colores;
         }
 
-        // Ordenar por grado (más conexiones primero)
         ids.sort((a, b) -> Integer.compare(
                 adyacencias.get(b).size(),
                 adyacencias.get(a).size()
         ));
 
-        // Asignar color al primer nodo
         colores.put(ids.get(0), 0);
 
-        // Colorear el resto
         for (int i = 1; i < ids.size(); i++) {
             String idActual = ids.get(i);
             Set<String> vecinos = adyacencias.get(idActual);
 
-            // Encontrar colores usados por vecinos
             Set<Integer> coloresUsados = new HashSet<>();
             for (String vecino : vecinos) {
                 if (colores.containsKey(vecino)) {
@@ -210,7 +244,6 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
                 }
             }
 
-            // Asignar el primer color disponible
             int colorAsignado = 0;
             while (coloresUsados.contains(colorAsignado)) {
                 colorAsignado++;
@@ -223,8 +256,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
     }
 
     /**
-     * Aplica k-coloración usando el algoritmo DSatur.
-     * Retorna un mapa donde la clave es el ID del bloque y el valor es el color (día).
+     * Aplica coloracion usando el algoritmo DSatur, devolviendo color por id de bloque.
      */
     public Map<String, Integer> colorearConDSatur() {
         Map<String, Integer> colores = new HashMap<>();
@@ -232,9 +264,7 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
             return colores;
         }
 
-        // Mapa de saturación: id -> número de colores distintos en sus vecinos
         Map<String, Integer> saturacion = new HashMap<>();
-        // Mapa de grado: id -> número de vecinos no coloreados
         Map<String, Integer> grado = new HashMap<>();
         List<String> nodosNoColoreados = new ArrayList<>(nodos.keySet());
 
@@ -244,9 +274,6 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
         }
 
         while (colores.size() < nodos.size()) {
-            // 1. Encontrar el nodo con máxima saturación. En caso de empate, el de mayor grado.
-            // Para garantizar el determinismo, se ordena la lista antes de cada selección.
-            // Si hay empates en saturación y grado, siempre se elegirá el mismo nodo (el primero en orden alfabético).
             Collections.sort(nodosNoColoreados);
 
             String nodoAColorear = null;
@@ -264,9 +291,10 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
                 }
             }
 
-            if (nodoAColorear == null) break; // Todos coloreados
+            if (nodoAColorear == null) {
+                break;
+            }
 
-            // 2. Encontrar el color más pequeño posible para este nodo
             Set<Integer> coloresDeVecinos = new HashSet<>();
             for (String vecinoId : adyacencias.get(nodoAColorear)) {
                 if (colores.containsKey(vecinoId)) {
@@ -279,21 +307,18 @@ public class AdaptadorGraficaDeHorarios implements GraficaHorario {
                 colorAsignado++;
             }
 
-            // 3. Asignar color y actualizar estructuras
             colores.put(nodoAColorear, colorAsignado);
             nodosNoColoreados.remove(nodoAColorear);
 
-            // 4. Actualizar la saturación de los vecinos
             for (String vecinoId : adyacencias.get(nodoAColorear)) {
-                if (!colores.containsKey(vecinoId)) { // Si el vecino no está coloreado
-                    // Recalcular la saturación del vecino
-                    Set<Integer> coloresDeVecinosDelVecino = new HashSet<>();
-                    for (String vecinoDelVecinoId : adyacencias.get(vecinoId)) {
-                        if (colores.containsKey(vecinoDelVecinoId)) {
-                            coloresDeVecinosDelVecino.add(colores.get(vecinoDelVecinoId));
+                if (!colores.containsKey(vecinoId)) {
+                    Set<Integer> coloresVecino = new HashSet<>();
+                    for (String v : adyacencias.get(vecinoId)) {
+                        if (colores.containsKey(v)) {
+                            coloresVecino.add(colores.get(v));
                         }
                     }
-                    saturacion.put(vecinoId, coloresDeVecinosDelVecino.size());
+                    saturacion.put(vecinoId, coloresVecino.size());
                 }
             }
         }

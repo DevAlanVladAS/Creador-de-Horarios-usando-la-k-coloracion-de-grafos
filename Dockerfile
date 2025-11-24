@@ -1,14 +1,14 @@
 # Imagen base con Java 17
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk-jammy
 
-# Crear directorio de trabajo
+# Directorio de trabajo
 WORKDIR /app
 
-# Copiar solo el código fuente y otros archivos necesarios
+# Copiar solo el codigo fuente
 COPY src ./src
 
-# Compilar los archivos Java (recursivo dentro de /src)
-RUN javac $(find src -name "*.java") -d out
+# Compilar todas las clases respetando los paquetes
+RUN javac -d out $(find src -name "*.java")
 
-# Establecer el classpath y ejecutar la clase principal
-CMD ["java", "-cp", "out", "Main"]
+# Clase principal (usa el paquete src)
+CMD ["java", "-cp", "out", "src.Main"]

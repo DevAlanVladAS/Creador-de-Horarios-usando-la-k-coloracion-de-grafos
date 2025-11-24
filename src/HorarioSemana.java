@@ -1,10 +1,15 @@
 package src;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 
+/**
+ * Contiene los dias de un horario y los bloques sin asignar.
+ * Notifica cambios estructurales a listeners (composite de HorarioDia/BloqueHorario).
+ */
 public class HorarioSemana implements HorarioComponente, java.io.Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -20,8 +25,8 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
          * Se invoca cuando la estructura de la semana cambia.
          * @param tipoEvento Tipo de cambio ocurrido
          * @param bloque Bloque involucrado (si aplica)
-         * @param diaOrigen DÃƒÆ’Ã‚Â­a de origen (para movimientos)
-         * @param diaDestino DÃƒÆ’Ã‚Â­a de destino (para movimientos/asignaciones)
+         * @param diaOrigen Dia de origen (para movimientos)
+         * @param diaDestino Dia de destino (para movimientos/asignaciones)
          */
         void onEstructuraCambiada(EventoSemana tipoEvento, BloqueHorario bloque, 
                                  String diaOrigen, String diaDestino);
@@ -31,13 +36,13 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
      * Tipos de eventos estructurales en la semana.
      */
     public enum EventoSemana {
-        BLOQUE_ASIGNADO,        // Bloque movido de "sin asignar" a un dí­a
-        BLOQUE_DESASIGNADO,     // Bloque movido de un día a "sin asignar"
-        BLOQUE_MOVIDO,          // Bloque movido entre di­as
-        BLOQUE_AGREGADO,        // Nuevo bloque agregado al sistema
-        BLOQUE_ELIMINADO,       // Bloque eliminado del sistema
-        DIA_AGREGADO,           // Nuevo dí­a agregado
-        DIA_ELIMINADO           // Dí­a eliminado
+        BLOQUE_ASIGNADO,
+        BLOQUE_DESASIGNADO,
+        BLOQUE_MOVIDO,
+        BLOQUE_AGREGADO,
+        BLOQUE_ELIMINADO,
+        DIA_AGREGADO,
+        DIA_ELIMINADO
     }
 
     private List<HorarioSemanaChangeListener> getListeners() {
@@ -47,12 +52,18 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         return listeners;
     }
 
+    /**
+     * Registra un listener de cambios estructurales.
+     */
     public void addListener(HorarioSemanaChangeListener listener) {
         if (!getListeners().contains(listener)) {
             getListeners().add(listener);
         }
     }
 
+    /**
+     * Desregistra un listener de cambios estructurales.
+     */
     public void removeListener(HorarioSemanaChangeListener listener) {
         getListeners().remove(listener);
     }
@@ -69,8 +80,9 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         }
     }
 
-
-    // Constructor
+    /**
+     * Crea una semana sin dias ni bloques asignados.
+     */
     public HorarioSemana() {
         this.diasSemana = new ArrayList<>();
         this.bloquesSinAsignar = new ArrayList<>();
@@ -78,9 +90,7 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
     }
 
     /**
-     * Inicializa la semana con una lista de días estándar.
-     * Si ya hay días, no hace nada.
-     * @param nombresDias Lista de nombres de los días a crear.
+     * Inicializa los dias de la semana (si aun no existen).
      */
     public void inicializarDias(List<String> nombresDias) {
         if (diasSemana.isEmpty() && nombresDias != null) {
@@ -125,24 +135,21 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         HorarioDia horarioDiaDestino = diasSemana.stream()
                 .filter(d -> d.getDia().equalsIgnoreCase(diaDestino))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Día no encontrado: " + diaDestino));
+                .orElseThrow(() -> new IllegalArgumentException("Dia no encontrado: " + diaDestino));
 
         String diaAnterior = asignaciones.get(bloque.getId());
 
-        // --- PASO 1: Limpieza exhaustiva de la posición anterior del bloque ---
-        // Se elimina de la lista de "sin asignar" y de CUALQUIER día en el que pudiera estar.
-        // Esto crea un "estado limpio" y previene duplicados incluso si 'asignaciones' está desincronizado.
+        // Paso 1: limpiar cualquier posicion previa (sin asignar o en otros dias)
         bloquesSinAsignar.removeIf(b -> b.getId().equals(bloque.getId()));
         for (HorarioDia dia : diasSemana) {
-            dia.eliminar(bloque); // Intenta eliminar el bloque de cada día.
+            dia.eliminar(bloque);
         }
 
-        // --- PASO 2: Intentar agregar el bloque a su nuevo día ---
+        // Paso 2: intentar agregar al nuevo dia
         boolean agregadoConExito = horarioDiaDestino.agregar(bloque);
 
-        // --- PASO 3: Actualizar estado y notificar basado en el resultado ---
+        // Paso 3: actualizar estado/notify segun resultado
         if (agregadoConExito) {
-            // Si tuvo éxito, se actualiza la asignación definitiva.
             asignaciones.put(bloque.getId(), diaDestino);
             
             if (diaAnterior == null) {
@@ -151,23 +158,22 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
                 notifyChange(EventoSemana.BLOQUE_MOVIDO, bloque, diaAnterior, diaDestino);
             }
         } else {
-            // Si falla (ej. por solapamiento), se asegura que el bloque termine en "sin asignar".
             if (!bloquesSinAsignar.contains(bloque)) {
                 bloquesSinAsignar.add(bloque);
             }
-            // Se elimina cualquier asignación para evitar un estado inconsistente.
             asignaciones.remove(bloque.getId());
 
-            // Se notifica que fue desasignado, ya que no se pudo colocar en el destino.
             if (diaAnterior != null) {
                 notifyChange(EventoSemana.BLOQUE_DESASIGNADO, bloque, diaAnterior, null);
             }
         }
     }
 
+    /**
+     * Envia un bloque a la lista de sin asignar y limpia registros previos.
+     */
     public void agregarBloqueSinAsignar(BloqueHorario bloque) {
         String diaAnterior = asignaciones.remove(bloque.getId());
-        // Limpia el bloque de cualquier día en el que pudiera estar para evitar duplicados.
         for (HorarioDia hd : diasSemana) {
             hd.eliminar(bloque);
         }
@@ -182,6 +188,9 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         }
     }
 
+    /**
+     * Asigna un bloque existente a un dia.
+     */
     public void asignarBloqueADia(String idBloque, String dia) {
         Optional<BloqueHorario> contenedor = obtenerBloquePorID(idBloque);
         if (contenedor.isEmpty()) {
@@ -209,6 +218,9 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         agregarBloqueEnDia(dia, bloque);
     }
 
+    /**
+     * Remueve un bloque de su dia y lo pasa a sin asignar.
+     */
     public void desasignarBloqueADia(String idBloque) {
         Optional<BloqueHorario> contenedor = obtenerBloquePorID(idBloque);
         if (contenedor.isEmpty()) {
@@ -219,10 +231,16 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         agregarBloqueSinAsignar(bloque);
     }
 
+    /**
+     * Alias para asignar un bloque a otro dia.
+     */
     public void moverBloque(String idBloque, String diaDestino) {
         asignarBloqueADia(idBloque, diaDestino);
     }
 
+    /**
+     * Elimina un bloque del sistema (dias y sin asignar).
+     */
     public void eliminarBloque(String idBloque) {
         Optional<BloqueHorario> contenedor = obtenerBloquePorID(idBloque);
         if (contenedor.isEmpty()) {
@@ -246,6 +264,9 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         notifyChange(EventoSemana.BLOQUE_ELIMINADO, bloque, diaActual, null);
     }
 
+    /**
+     * Busca un bloque por ID en dias y sin asignar.
+     */
     public Optional<BloqueHorario> obtenerBloquePorID(String id) {
         for (HorarioDia dia : diasSemana) {
             for (BloqueHorario b : dia.getBloques()) {
@@ -264,6 +285,9 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
         return Optional.empty();
     }
 
+    /**
+     * Busca un dia por nombre.
+     */
     public Optional<HorarioDia> obtenerDiaPorNombre(String nombreDia) {
         return diasSemana.stream()
             .filter(dia -> dia.getDia().equalsIgnoreCase(nombreDia))
@@ -293,7 +317,7 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
             notifyChange(EventoSemana.BLOQUE_AGREGADO, bloque, null, null);
             return true;
         }
-        throw new IllegalArgumentException("Tipo inválido: " + comp);
+        throw new IllegalArgumentException("Tipo invalido: " + comp);
     }
 
     @Override
@@ -306,7 +330,7 @@ public class HorarioSemana implements HorarioComponente, java.io.Serializable {
             eliminarBloque(((BloqueHorario) comp).getId());
             return;
         }
-        throw new IllegalArgumentException("Tipo inválido: " + comp);
+        throw new IllegalArgumentException("Tipo invalido: " + comp);
     }
 
     @Override

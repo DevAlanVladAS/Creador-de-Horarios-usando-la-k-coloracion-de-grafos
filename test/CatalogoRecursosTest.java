@@ -61,7 +61,7 @@ public class CatalogoRecursosTest {
 
     @Test
     public void testAddAndGetGrupo() {
-        GrupoEstudiantes g = new GrupoEstudiantes("Grupo 301");
+        GrupoEstudiantes g = new GrupoEstudiantes("Grupo 301", 0);
         catalogo.addGrupo(g);
 
         GrupoEstudiantes obtenido = catalogo.obtenerGrupoPorId(g.getId());
@@ -87,7 +87,7 @@ public class CatalogoRecursosTest {
     public void testReset() {
         catalogo.addProfesor(new Profesor("Profesor", null, Arrays.asList("Lunes"), null));
         catalogo.addSalon(new Salon("Salon", 0));
-        catalogo.addGrupo(new GrupoEstudiantes("Grupo"));
+        catalogo.addGrupo(new GrupoEstudiantes("Grupo", 0));
 
         assertFalse(catalogo.getTodosLosProfesores().isEmpty());
         assertFalse(catalogo.getTodosLosSalones().isEmpty());
@@ -104,7 +104,7 @@ public class CatalogoRecursosTest {
     public void testFindByName() {
         Profesor p = new Profesor("Dr. Garcia", null, Arrays.asList("Lunes"), null);
         Salon s = new Salon("Sala A", 0);
-        GrupoEstudiantes g = new GrupoEstudiantes("Grupo 1A");
+        GrupoEstudiantes g = new GrupoEstudiantes("Grupo 1A", 0);
         catalogo.addProfesor(p);
         catalogo.addSalon(s);
         catalogo.addGrupo(g);
@@ -128,7 +128,7 @@ public class CatalogoRecursosTest {
         catalogo.addProfesor(p);
 
         Optional<Profesor> profEncontrado = catalogo.findProfesorByName("dr. garcia");
-        assertTrue("La búsqueda debe ser insensible a mayúsculas/minúsculas", profEncontrado.isPresent());
+        assertTrue("La busqueda debe ser insensible a mayusculas/minusculas", profEncontrado.isPresent());
         assertEquals(p.getId(), profEncontrado.get().getId());
     }
 
@@ -142,19 +142,19 @@ public class CatalogoRecursosTest {
     public void testMateriasPrecargadas() {
         List<Materia> materias = catalogo.getTodasLasMaterias();
         assertFalse("Debe haber materias precargadas", materias.isEmpty());
-        assertTrue(materias.stream().anyMatch(m -> m.getNombre().equalsIgnoreCase("Matemáticas")));
+        assertTrue(materias.stream().anyMatch(m -> m.getNombre().equalsIgnoreCase("Matematicas")));
     }
 
     @Test
     public void testAsignacionGeneraBloques() {
-        Profesor profesor = new Profesor("Profesor Test", "Matemáticas");
+        Profesor profesor = new Profesor("Profesor Test", "Matematicas");
         catalogo.addProfesor(profesor);
-        GrupoEstudiantes grupo = new GrupoEstudiantes("1A");
+        GrupoEstudiantes grupo = new GrupoEstudiantes("1A", 0);
         catalogo.addGrupo(grupo);
         Salon salon = new Salon("Aula 1", 30);
         catalogo.addSalon(salon);
-        Materia materia = catalogo.findMateriaByName("Matemáticas").orElseGet(() -> {
-            Materia nueva = new Materia("Matemáticas", 5);
+        Materia materia = catalogo.findMateriaByName("Matematicas").orElseGet(() -> {
+            Materia nueva = new Materia("Matematicas", 5);
             catalogo.addMateria(nueva);
             return nueva;
         });
@@ -171,4 +171,3 @@ public class CatalogoRecursosTest {
         assertEquals(3, catalogo.getBloquesByGrupoId(grupo.getId()).size());
     }
 }
-

@@ -1,4 +1,5 @@
 package src;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalTime;
@@ -8,8 +9,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Describe la carga académica de una materia asignada a un grupo con un profesor.
- * Permite conocer cuántas horas a la semana deben programarse y genera los bloques base.
+ * Representa la asignacion academica (profesor, grupo, materia, salon) y
+ * calcula los bloques semanales que deben programarse para cumplir las horas.
  */
 public class AsignacionAcademica implements Serializable {
 
@@ -21,10 +22,16 @@ public class AsignacionAcademica implements Serializable {
     private int horasSemanales;
     private final List<String> bloqueIds = new ArrayList<>();
 
+    /**
+     * Crea una asignacion generando un ID aleatorio.
+     */
     public AsignacionAcademica(String grupoId, String profesorId, String materiaId, String salonId, int horasSemanales) {
         this(null, grupoId, profesorId, materiaId, salonId, horasSemanales);
     }
 
+    /**
+     * Crea una asignacion con un ID conocido (o generado si es nulo).
+     */
     public AsignacionAcademica(String id, String grupoId, String profesorId, String materiaId, String salonId, int horasSemanales) {
 
         if (grupoId == null || profesorId == null || materiaId == null) {
@@ -38,38 +45,65 @@ public class AsignacionAcademica implements Serializable {
         this.horasSemanales = Math.max(1, horasSemanales);
     }
 
+    /**
+     * Identificador de la asignacion.
+     */
     public String getId() {
         return id;
     }
 
+    /**
+     * ID del grupo al que pertenece esta asignacion.
+     */
     public String getGrupoId() {
         return grupoId;
     }
 
+    /**
+     * ID del profesor asignado.
+     */
     public String getProfesorId() {
         return profesorId;
     }
 
+    /**
+     * ID de la materia asignada.
+     */
     public String getMateriaId() {
         return materiaId;
     }
 
+    /**
+     * ID del salon asignado (puede ser nulo si no se define).
+     */
     public String getSalonId() {
         return salonId;
     }
 
+    /**
+     * Horas semanales requeridas para esta asignacion.
+     */
     public int getHorasSemanales() {
         return horasSemanales;
     }
 
+    /**
+     * Ajusta horas semanales garantizando un minimo de 1.
+     */
     public void setHorasSemanales(int horasSemanales) {
         this.horasSemanales = Math.max(1, horasSemanales);
     }
 
+    /**
+     * IDs de los bloques generados para esta asignacion.
+     */
     public List<String> getBloqueIds() {
         return Collections.unmodifiableList(bloqueIds);
     }
 
+    /**
+     * Registra los bloques asociados guardando solo sus IDs.
+     */
     public void registrarBloques(List<BloqueHorario> bloques) {
         bloqueIds.clear();
         if (bloques == null) {
@@ -80,10 +114,17 @@ public class AsignacionAcademica implements Serializable {
         }
     }
 
+    /**
+     * Construye bloques usando la plantilla estandar de horas y duracion.
+     */
     public List<BloqueHorario> construirBloques(String materiaNombre) {
         return construirBloques(materiaNombre, PlantillaHoraria.BLOQUES_ESTANDAR, PlantillaHoraria.DURACION_BLOQUE);
     }
 
+    /**
+     * Construye bloques respetando una lista de horas disponibles (hora exacta de inicio).
+     * Si no se proveen horas, recurre al comportamiento estandar.
+     */
     public List<BloqueHorario> construirBloquesRespetandoDisponibilidad(String materiaNombre, List<String> horasDisponibles) {
         List<BloqueHorario> bloques = new ArrayList<>();
         if (materiaNombre == null || materiaNombre.isBlank() || horasDisponibles == null || horasDisponibles.isEmpty()) {
@@ -93,7 +134,6 @@ public class AsignacionAcademica implements Serializable {
         Duration bloqueDuracion = PlantillaHoraria.DURACION_BLOQUE;
         int bloquesGenerados = 0;
 
-        // Convertir horasDisponibles (strings como "7:00", "8:00") a LocalTime
         List<LocalTime> horasDispoLocales = new ArrayList<>();
         for (String hora : horasDisponibles) {
             try {
@@ -109,7 +149,6 @@ public class AsignacionAcademica implements Serializable {
             return construirBloques(materiaNombre); // Fallback
         }
 
-        // Generar bloques solo en horas disponibles
         for (int i = 0; i < horasSemanales && bloquesGenerados < horasSemanales; i++) {
             LocalTime slot = horasDispoLocales.get(i % horasDispoLocales.size());
             int repeticion = i / horasDispoLocales.size();
@@ -132,6 +171,9 @@ public class AsignacionAcademica implements Serializable {
         return bloques;
     }
 
+    /**
+     * Construye bloques usando una base de horas y una duracion configurables.
+     */
     public List<BloqueHorario> construirBloques(String materiaNombre, List<LocalTime> horasBase, Duration duracion) {
 
         List<BloqueHorario> bloques = new ArrayList<>();

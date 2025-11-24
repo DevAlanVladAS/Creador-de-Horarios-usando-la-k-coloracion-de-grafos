@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Queue;
 
 /**
- * Anima la colocación de bloques en el horario después de la generación automática.
- * Ahora funciona a través de GestorHorarios para actualizar el modelo.
+ * Anima la colocacion visual y en el modelo de una lista de bloques,
+ * avanzando uno a uno con un temporizador para dar feedback al usuario.
  */
 public class AnimadorHorario {
 
@@ -20,13 +20,16 @@ public class AnimadorHorario {
     private final JLabel estadoLabel;
     private final Runnable alFinalizar;
 
+    /**
+     * Prepara la animacion con la lista de bloques, la etiqueta de estado y un callback final.
+     */
     public AnimadorHorario(List<BloqueHorario> bloquesAAsignar, JLabel estadoLabel, Runnable alFinalizar) {
         this.gestor = GestorHorarios.getInstance();
         this.colaDeBloques = new LinkedList<>(bloquesAAsignar);
         this.estadoLabel = estadoLabel;
         this.alFinalizar = alFinalizar;
 
-        // Mezclar para un efecto más dinámico
+        // Mezcla la cola para un efecto mas dinamico al mostrar asignaciones.
         Collections.shuffle((List<?>) this.colaDeBloques);
 
         this.timer = new Timer(75, new ActionListener() {
@@ -35,7 +38,7 @@ public class AnimadorHorario {
                 if (colaDeBloques.isEmpty()) {
                     timer.stop();
                     if (estadoLabel != null) {
-                        estadoLabel.setText("Estado: Animación completada.");
+                        estadoLabel.setText("Estado: Animacion completada.");
                     }
                     if (alFinalizar != null) {
                         alFinalizar.run();
@@ -45,7 +48,7 @@ public class AnimadorHorario {
 
                 BloqueHorario bloque = colaDeBloques.poll();
                 if (bloque.getDia() != null && bloque.getHoraInicio() != null) {
-                    // Actualizar posición a través del gestor para notificar observers
+                    // Actualiza la posicion a traves del gestor para notificar observadores.
                     gestor.actualizarPosicionBloque(bloque, bloque.getDia(), bloque.getHoraInicio());
                 }
 
@@ -58,7 +61,7 @@ public class AnimadorHorario {
     }
 
     /**
-     * Inicia la animación de colocación de bloques.
+     * Inicia la animacion si el temporizador no esta ya corriendo.
      */
     public void iniciar() {
         if (!timer.isRunning()) {

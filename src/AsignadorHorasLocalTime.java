@@ -1,16 +1,12 @@
 package src;
+
 import java.time.*;
-import java.util.*;
 import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 /**
- * Fase 3: Asignación de horas dentro de un día usando LocalTime.
- * CORREGIDO: Mejor manejo de disponibilidad y conflictos.
- * 
- * - Ordena bloques por duración (más largos primero).
- * - Intenta colocarlos empezando desde horaInicioDia en intervalos de 50 min.
- * - Respeta validadores de conflicto (recurso, profesor, grupo, etc.)
- * - Actualiza horaInicio y horaFin correctamente.
+ * Asigna horas a los bloques de un horario semanal usando LocalTime, respetando
+ * disponibilidad de profesores y validadores de conflicto.
  */
 public class AsignadorHorasLocalTime {
 
@@ -19,6 +15,9 @@ public class AsignadorHorasLocalTime {
     private final LocalTime horaFinDia;
     private final List<Validador> validadoresHora;
 
+    /**
+     * Inicializa el asignador con el catalogo, rango de horario diario y validadores.
+     */
     public AsignadorHorasLocalTime(CatalogoRecursos catalogo,
                                    LocalTime horaInicioDia,
                                    LocalTime horaFinDia,
@@ -28,38 +27,40 @@ public class AsignadorHorasLocalTime {
         this.horaInicioDia = horaInicioDia;
         this.horaFinDia = horaFinDia;
 
-        this.validadoresHora = 
+        this.validadoresHora =
                 validadoresHora != null ? new ArrayList<>(validadoresHora)
                                         : new ArrayList<>();
     }
 
+    /**
+     * Asigna horas a cada dia del horario semanal.
+     */
     public void asignarHoras(HorarioSemana semana) {
         for (HorarioDia dia : semana.getDiasSemana()) {
             asignarHorasEnDia(dia);
         }
     }
 
+    /**
+     * Asigna horas a los bloques de un dia dado priorizando restricciones y evitando conflictos.
+     */
     private void asignarHorasEnDia(HorarioDia dia) {
         System.out.println("\n  Asignando horas para " + dia.getDia() + "...");
-        
-        // Copiamos bloques del día
+
         List<BloqueHorario> bloques = new ArrayList<>(dia.getBloques());
-        
+
         if (bloques.isEmpty()) {
             System.out.println("    (sin bloques)");
             return;
         }
 
-        // MEJORADO: Orden por prioridad
-        // 1. Bloques con restricciones de hora primero
-        // 2. Luego por duración descendente
         bloques.sort((a, b) -> {
             boolean aRestringido = tieneRestriccionHoraria(a);
             boolean bRestringido = tieneRestriccionHoraria(b);
-            
+
             if (aRestringido && !bRestringido) return -1;
             if (!aRestringido && bRestringido) return 1;
-            
+
             return b.getDuracion().compareTo(a.getDuracion());
         });
 
@@ -71,36 +72,37 @@ public class AsignadorHorasLocalTime {
 
             if (pudo) {
                 bloquesExitosos++;
-                System.out.println("    ✓ " + bloque.getMateria() + 
+                System.out.println("    ✓ " + bloque.getMateria() +
                                  " (" + bloque.getHoraInicio() + "-" + bloque.getHoraFin() + ")");
             } else {
-                System.out.println("    ✗ " + bloque.getMateria() + 
+                System.out.println("    ✗ " + bloque.getMateria() +
                                  " (no se pudo asignar hora)");
-                // CORREGIDO: Mantener en la lista pero sin hora
                 asignados.add(bloque);
             }
         }
 
         System.out.println("    Total: " + bloquesExitosos + "/" + bloques.size() + " bloques asignados");
 
-        // Actualiza el día con el orden final
         dia.getBloques().clear();
         dia.getBloques().addAll(asignados);
     }
 
     /**
-     * NUEVO: Verifica si un bloque tiene restricciones horarias del profesor
+     * Indica si el bloque tiene restricciones horarias por disponibilidad del profesor.
      */
     private boolean tieneRestriccionHoraria(BloqueHorario bloque) {
         if (bloque.getProfesorId() == null) return false;
-        
+
         Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
         if (profesor == null) return false;
-        
+
         List<String> horas = profesor.getHorasDisponibles();
         return horas != null && !horas.isEmpty();
     }
 
+    /**
+     * Intenta ubicar un bloque en un dia probando horas preferidas y luego intervalos de 50 minutos.
+     */
     private boolean intentarColocarBloque(HorarioDia dia,
                                           BloqueHorario bloque,
                                           List<BloqueHorario> asignados,
@@ -108,11 +110,9 @@ public class AsignadorHorasLocalTime {
 
         Duration dur = bloque.getDuracion();
         LocalTime tiempo = horaInicioDia;
-        
-        // MEJORADO: Obtener horas disponibles del profesor si existen
+
         List<LocalTime> horasPreferidas = obtenerHorasDisponibles(bloque, dia.getDia());
 
-        // ESTRATEGIA 1: Intentar en horas preferidas del profesor
         if (!horasPreferidas.isEmpty()) {
             for (LocalTime horaPreferida : horasPreferidas) {
                 if (intentarAsignarEnHora(bloque, horaPreferida, dur, dia, asignados, todosLosBloquesDelDia)) {
@@ -121,19 +121,18 @@ public class AsignadorHorasLocalTime {
             }
         }
 
-        // ESTRATEGIA 2: Búsqueda exhaustiva en intervalos de 50 minutos
         while (!tiempo.plus(dur).isAfter(horaFinDia)) {
             if (intentarAsignarEnHora(bloque, tiempo, dur, dia, asignados, todosLosBloquesDelDia)) {
                 return true;
             }
-            tiempo = tiempo.plusMinutes(50); // CORREGIDO: Bloques de 50 min
+            tiempo = tiempo.plusMinutes(50);
         }
 
         return false;
     }
 
     /**
-     * NUEVO: Intenta asignar un bloque en una hora específica
+     * Intenta asignar un bloque en una hora concreta evaluando solapes y reglas.
      */
     private boolean intentarAsignarEnHora(
             BloqueHorario bloque,
@@ -142,48 +141,41 @@ public class AsignadorHorasLocalTime {
             HorarioDia dia,
             List<BloqueHorario> asignados,
             List<BloqueHorario> todosLosBloquesDelDia) {
-        
+
         LocalTime fin = inicio.plus(dur);
-        
-        // Verificar que no exceda el horario del día
+
         if (fin.isAfter(horaFinDia)) {
             return false;
         }
 
-        // 1. Checar empalme básico
         if (hayEmpalmeCon(inicio, fin, asignados)) {
             return false;
         }
 
-        // 2. Checar disponibilidad de recursos (profesor, etc.)
         if (!esHorarioValidoParaRecursos(bloque, dia.getDia(), inicio)) {
             return false;
         }
 
-        // 3. Guardar estado original
         LocalTime inicioOriginal = bloque.getHoraInicio();
         LocalTime finOriginal = bloque.getHoraFin();
 
         bloque.actualizarIntervalo(inicio, fin);
 
-        // 4. Validadores
         boolean valido = true;
 
-        // Regla: no más de 2 horas seguidas de la misma materia en el día
         if (excedeMaximoConsecutivoMateria(bloque, asignados)) {
             valido = false;
         }
 
-        // Regla adicional: máximo 2 horas totales al día por materia (no dividir en dos tramos separados)
         if (valido && excedeMaximoDiarioMateria(bloque, asignados, todosLosBloquesDelDia, dur)) {
             valido = false;
         }
 
         for (BloqueHorario other : asignados) {
             if (other == bloque) continue;
-            
+
             for (Validador v : validadoresHora) {
-                if (!v.validar(bloque, other, null).isEmpty()) { // Asumimos que para hora no se necesita el contexto completo
+                if (!v.validar(bloque, other, null).isEmpty()) {
                     valido = false;
                     break;
                 }
@@ -196,7 +188,6 @@ public class AsignadorHorasLocalTime {
             return true;
         }
 
-        // Revertir
         if (inicioOriginal != null && finOriginal != null) {
             bloque.actualizarIntervalo(inicioOriginal, finOriginal);
         } else {
@@ -208,14 +199,13 @@ public class AsignadorHorasLocalTime {
     }
 
     /**
-     * Verifica si al colocar este bloque se exceden 2 horas consecutivas de la misma materia en el día.
+     * Verifica si se exceden 2 horas consecutivas de la misma materia en el dia.
      */
     private boolean excedeMaximoConsecutivoMateria(BloqueHorario bloque, List<BloqueHorario> asignados) {
         if (bloque.getMateria() == null || bloque.getHoraInicio() == null || bloque.getHoraFin() == null) {
             return false;
         }
 
-        // Reunir todos los intervalos de la misma materia (incluyendo el bloque actual)
         List<BloqueHorario> mismos = new ArrayList<>();
         mismos.add(bloque);
         for (BloqueHorario b : asignados) {
@@ -227,7 +217,6 @@ public class AsignadorHorasLocalTime {
 
         if (mismos.isEmpty()) return false;
 
-        // Ordenar por inicio y encontrar cadenas consecutivas
         mismos.sort(Comparator.comparing(BloqueHorario::getHoraInicio));
         LocalTime cadenaInicio = mismos.get(0).getHoraInicio();
         LocalTime cadenaFin = mismos.get(0).getHoraFin();
@@ -235,13 +224,10 @@ public class AsignadorHorasLocalTime {
         for (int i = 1; i < mismos.size(); i++) {
             BloqueHorario actual = mismos.get(i);
             if (actual.getHoraInicio().equals(cadenaFin)) {
-                // continuidad exacta
                 cadenaFin = actual.getHoraFin();
             } else if (actual.getHoraInicio().isBefore(cadenaFin)) {
-                // solape — ya sería conflicto por validador de hora
                 cadenaFin = max(cadenaFin, actual.getHoraFin());
             } else {
-                // nueva cadena
                 cadenaInicio = actual.getHoraInicio();
                 cadenaFin = actual.getHoraFin();
             }
@@ -251,7 +237,6 @@ public class AsignadorHorasLocalTime {
             }
         }
 
-        // También evaluar la primera cadena sola
         if (Duration.between(mismos.get(0).getHoraInicio(), mismos.get(0).getHoraFin()).toMinutes() > 120) {
             return true;
         }
@@ -260,8 +245,7 @@ public class AsignadorHorasLocalTime {
     }
 
     /**
-     * Verifica que la suma total de horas de la materia en el día no supere 120 minutos,
-     * incluso si estuvieran separadas por huecos.
+     * Verifica que la suma diaria de una materia no supere 120 minutos aunque haya huecos.
      */
     private boolean excedeMaximoDiarioMateria(BloqueHorario bloque,
                                               List<BloqueHorario> asignados,
@@ -273,8 +257,7 @@ public class AsignadorHorasLocalTime {
 
         long minutos = durNuevo != null ? durNuevo.toMinutes() : 0;
 
-        // Usar conjunto para evitar contar el mismo bloque dos veces
-        java.util.Set<String> vistos = new java.util.HashSet<>();
+        Set<String> vistos = new HashSet<>();
         String idBloque = bloque.getId();
 
         for (BloqueHorario b : asignados) {
@@ -286,7 +269,7 @@ public class AsignadorHorasLocalTime {
                 }
             }
         }
-        // incluir otros bloques del día ya existentes aunque no estén en asignados, excepto el mismo bloque
+
         if (todosLosBloquesDelDia != null) {
             for (BloqueHorario b : todosLosBloquesDelDia) {
                 if (b == null || b.getId() == null || b.getId().equals(idBloque)) continue;
@@ -307,42 +290,39 @@ public class AsignadorHorasLocalTime {
     }
 
     /**
-     * NUEVO: Obtiene las horas disponibles del profesor como LocalTime
+     * Obtiene las horas disponibles del profesor como LocalTime para el dia indicado.
      */
     private List<LocalTime> obtenerHorasDisponibles(BloqueHorario bloque, String dia) {
         List<LocalTime> horas = new ArrayList<>();
-        
+
         if (bloque.getProfesorId() == null) {
             return horas;
         }
-        
+
         Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
         if (profesor == null) {
             return horas;
         }
-        
-        // Verificar que el profesor esté disponible este día
+
         List<String> diasDisp = profesor.getDiasDisponibles();
         if (diasDisp != null && !diasDisp.isEmpty()) {
             boolean diaDisponible = diasDisp.stream()
                     .anyMatch(d -> d.equalsIgnoreCase(dia));
             if (!diaDisponible) {
-                return horas; // No está disponible este día
+                return horas;
             }
         }
-        
+
         List<String> horasDisp = profesor.getHorasDisponibles();
         if (horasDisp == null || horasDisp.isEmpty()) {
             return horas;
         }
-        
-        // Convertir strings a LocalTime
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("H:mm");
         for (String horaStr : horasDisp) {
             try {
                 LocalTime hora = LocalTime.parse(horaStr, formatter);
-                // Solo agregar si está dentro del rango del día
-                if (!hora.isBefore(horaInicioDia) && 
+                if (!hora.isBefore(horaInicioDia) &&
                     !hora.plus(bloque.getDuracion()).isAfter(horaFinDia)) {
                     horas.add(hora);
                 }
@@ -350,11 +330,14 @@ public class AsignadorHorasLocalTime {
                 System.err.println("Error parseando hora: " + horaStr);
             }
         }
-        
+
         horas.sort(LocalTime::compareTo);
         return horas;
     }
 
+    /**
+     * Determina si el intervalo propuesto empalma con alguno ya asignado.
+     */
     private boolean hayEmpalmeCon(LocalTime inicio,
                                   LocalTime fin,
                                   List<BloqueHorario> asignados) {
@@ -376,13 +359,14 @@ public class AsignadorHorasLocalTime {
         return false;
     }
 
+    /**
+     * Valida que profesor (y potencialmente otros recursos) esten disponibles para ese dia/hora.
+     */
     private boolean esHorarioValidoParaRecursos(BloqueHorario bloque, String dia, LocalTime hora) {
-        // Validar Profesor
         String profesorId = bloque.getProfesorId();
         if (profesorId != null) {
             Profesor profesor = catalogo.obtenerProfesorPorId(profesorId);
             if (profesor != null) {
-                // Validar día
                 List<String> diasDisponibles = profesor.getDiasDisponibles();
                 if (diasDisponibles != null && !diasDisponibles.isEmpty()) {
                     boolean diaValido = diasDisponibles.stream()
@@ -391,8 +375,7 @@ public class AsignadorHorasLocalTime {
                         return false;
                     }
                 }
-                
-                // Validar hora
+
                 List<String> horasDisponibles = profesor.getHorasDisponibles();
                 if (horasDisponibles != null && !horasDisponibles.isEmpty()) {
                     String horaFormateada = hora.format(DateTimeFormatter.ofPattern("H:mm"));
@@ -402,8 +385,6 @@ public class AsignadorHorasLocalTime {
                 }
             }
         }
-
-        // Aquí se podrían agregar validaciones para salones, etc.
 
         return true;
     }

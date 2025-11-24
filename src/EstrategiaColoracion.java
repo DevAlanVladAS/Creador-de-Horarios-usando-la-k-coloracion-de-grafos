@@ -5,48 +5,42 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Estrategia de generación de horarios usando k-coloración de grafos.
- * CORREGIDO: Ahora respeta la disponibilidad de profesores al asignar días.
- * 
- * Proceso en 3 fases:
- * 1. Construcción de gráfica de conflictos
- * 2. Coloración del grafo con validación de disponibilidad (asignación de días)
- * 3. Asignación de horas dentro de cada día
+ * Estrategia de generacion de horarios via k-coloracion:
+ * construye la grafica de conflictos, colorea respetando disponibilidad,
+ * y luego asigna horas dentro de cada dia.
  */
 public class EstrategiaColoracion implements EstrategiaGeneracion {
     
     @Override
     public HorarioSemana generarHorario(AdaptadorGraficaDeHorarios horarioGrafica) {
         
-        // FASE 1: Construir gráfica de conflictos
-        System.out.println("\n=== FASE 1: Construcción de gráfica ===");
+        // FASE 1: Construir grafica de conflictos
+        System.out.println("\n=== FASE 1: Construccion de grafica ===");
         horarioGrafica.construirGraficaAutomaticamente();
-        System.out.println("Gráfica construida con " + horarioGrafica.obtenerNumeroNodos() + 
+        System.out.println("Grafica construida con " + horarioGrafica.obtenerNumeroNodos() + 
                            " nodos y " + horarioGrafica.obtenerNumeroAristas() + " aristas");
 
-        // FASE 2: Colorear grafo con DSatur RESPETANDO disponibilidad de profesores
-        System.out.println("\n=== FASE 2: Coloración con DSatur (asignación de días) ===");
+        // FASE 2: Colorear grafo respetando disponibilidad de profesores
+        System.out.println("\n=== FASE 2: Coloracion con DSatur (asignacion de dias) ===");
         
-        List<String> dias = Arrays.asList("Lunes", "Martes", "Miércoles", "Jueves", "Viernes");
+        List<String> dias = Arrays.asList("Lunes", "Martes", "Miercoles", "Jueves", "Viernes");
         Map<String, Integer> colores = colorearConDisponibilidad(horarioGrafica, dias);
         
-        // Determinar cuántos colores (días) se necesitaron
         int maxColor = colores.values().stream().max(Integer::compare).orElse(-1);
         int numColoresUsados = maxColor + 1;
-        System.out.println("Se necesitaron " + numColoresUsados + " colores (días)");
+        System.out.println("Se necesitaron " + numColoresUsados + " colores (dias)");
         
         if (numColoresUsados > dias.size()) {
             System.out.println("ADVERTENCIA: Se necesitan " + numColoresUsados + 
-                             " días pero solo hay " + dias.size() + " disponibles");
+                             " dias pero solo hay " + dias.size() + " disponibles");
         }
         
-        // Crear HorarioSemana
         HorarioSemana horarioSemana = new HorarioSemana();
         for (String dia : dias) {
             horarioSemana.agregarDia(new HorarioDia(dia));
         }
         
-        // Asignar bloques a días según el color
+        // Asignar bloques a dias segun color
         for (Map.Entry<String, Integer> entry : colores.entrySet()) {
             String bloqueId = entry.getKey();
             int color = entry.getValue();
@@ -63,8 +57,8 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
             }
         }
         
-        // FASE 3: Asignar horas dentro de cada día
-        System.out.println("\n=== FASE 3: Asignación de horas ===");
+        // FASE 3: Asignar horas dentro de cada dia
+        System.out.println("\n=== FASE 3: Asignacion de horas ===");
         List<Validador> validadores = Arrays.asList(
             new ValidadorPorProfesor(),
             new ValidadorPorSalon(),
@@ -74,7 +68,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         AsignadorHorasLocalTime asignadorHoras = new AsignadorHorasLocalTime(
             horarioGrafica.getCatalogo(), 
             LocalTime.of(7, 0),
-            LocalTime.of(15, 0), // CORREGIDO: Horario más realista (7am-3pm)
+            LocalTime.of(15, 0),
             validadores
         );
         
@@ -85,8 +79,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
     }
     
     /**
-     * NUEVO: Coloración que respeta la disponibilidad de profesores.
-     * Similar a DSatur pero con restricciones adicionales.
+     * Colorea la grafica respetando disponibilidad de profesor y conflictos.
      */
     private Map<String, Integer> colorearConDisponibilidad(
             AdaptadorGraficaDeHorarios grafica, 
@@ -100,13 +93,11 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
             return colores;
         }
         
-        // Saturación: colores distintos usados por vecinos
         Map<String, Set<Integer>> saturacion = new HashMap<>();
         for (String id : nodos) {
             saturacion.put(id, new HashSet<>());
         }
         
-        // 1. Colorear el nodo con mayor grado primero
         String primero = nodos.stream()
                 .max(Comparator.comparingInt(id -> adyacencias.get(id).size()))
                 .orElse(nodos.get(0));
@@ -114,15 +105,12 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         int colorPrimero = asignarMejorColor(primero, grafica, colores, dias, saturacion.get(primero));
         colores.put(primero, colorPrimero);
         
-        // Actualizar saturación de vecinos
         for (String vecino : adyacencias.get(primero)) {
             saturacion.get(vecino).add(colorPrimero);
         }
         
-        // 2. Colorear el resto por saturación (DSatur)
         while (colores.size() < nodos.size()) {
             
-            // Encontrar nodo con máxima saturación (y mayor grado en empates)
             String siguiente = nodos.stream()
                     .filter(id -> !colores.containsKey(id))
                     .max(Comparator
@@ -132,13 +120,11 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
             
             if (siguiente == null) break;
             
-            // Asignar el mejor color disponible respetando disponibilidad
             int colorAsignado = asignarMejorColor(
                     siguiente, grafica, colores, dias, saturacion.get(siguiente));
             
             colores.put(siguiente, colorAsignado);
             
-            // Actualizar saturación de vecinos no coloreados
             for (String vecino : adyacencias.get(siguiente)) {
                 if (!colores.containsKey(vecino)) {
                     saturacion.get(vecino).add(colorAsignado);
@@ -150,9 +136,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
     }
     
     /**
-     * NUEVO: Encuentra el mejor color (día) para un bloque respetando:
-     * 1. Disponibilidad del profesor
-     * 2. No conflicto con vecinos ya coloreados
+     * Selecciona el mejor color (dia) posible para un bloque respetando disponibilidad.
      */
     private int asignarMejorColor(
             String bloqueId,
@@ -164,18 +148,14 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
         BloqueHorario bloque = grafica.obtenerBloque(bloqueId);
         CatalogoRecursos catalogo = grafica.getCatalogo();
         
-        // Obtener días disponibles del profesor
         Set<String> diasDisponiblesProfesor = getDiasDisponiblesProfesor(bloque, catalogo);
         
-        // Intentar asignar color respetando disponibilidad
-        for (int color = 0; color < dias.size() * 2; color++) { // *2 para permitir extensión
+        for (int color = 0; color < dias.size() * 2; color++) {
             
-            // Si el color está usado por un vecino, saltar
             if (coloresVecinos.contains(color)) {
                 continue;
             }
             
-            // Si el color está dentro del rango de días
             if (color < dias.size()) {
                 String dia = dias.get(color);
                 
@@ -184,68 +164,52 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
                 }
             }
             
-            // Este color es válido
             return color;
         }
         
-        // Si no se encontró color válido, devolver el mínimo disponible
         int color = 0;
         while (coloresVecinos.contains(color)) {
             color++;
         }
-        System.out.println("  ADVERTENCIA: No se encontró día disponible para " + 
+        System.out.println("  ADVERTENCIA: No se encontro dia disponible para " + 
                          bloque.getMateria() + ", asignando color " + color);
         return color;
     }
 
+    /**
+     * Valida si un dia es aceptable para un bloque (disponibilidad y conflictos previos).
+     */
     private boolean esDiaValidoParaBloque(BloqueHorario bloque, String dia, Set<Integer> coloresVecinos, Set<String> diasDisponiblesProfesor) {
-        int color = Arrays.asList("Lunes", "Martes", "Miércoles", "Jueves", "Viernes").indexOf(dia);
+        int color = Arrays.asList("Lunes", "Martes", "Miercoles", "Jueves", "Viernes").indexOf(dia);
         if (coloresVecinos.contains(color)) {
             return false;
         }
         return diasDisponiblesProfesor.isEmpty() || diasDisponiblesProfesor.contains(dia);
     }
 
-
-    
+    /**
+     * Obtiene los dias disponibles del profesor del bloque (vacio si no hay restricciones).
+     */
     private Set<String> getDiasDisponiblesProfesor(BloqueHorario bloque, CatalogoRecursos catalogo) {
         if (bloque.getProfesorId() == null) {
-            return Collections.emptySet(); // Sin restricción
+            return Collections.emptySet();
         }
         
         Profesor profesor = catalogo.obtenerProfesorPorId(bloque.getProfesorId());
         if (profesor == null) {
-            return Collections.emptySet(); // Sin restricción
+            return Collections.emptySet();
         }
         
         List<String> dias = profesor.getDiasDisponibles();
         if (dias == null || dias.isEmpty()) {
-            return Collections.emptySet(); // Sin restricción
+            return Collections.emptySet();
         }
         
         return new HashSet<>(dias);
     }
     
-    private boolean hayConflictoEnDia(BloqueHorario bloque, int color, AdaptadorGraficaDeHorarios grafica, Map<String, Integer> coloresAsignados, ValidadorDeHorarios validador) {
-        
-        // Obtener todos los bloques ya asignados a este color
-        List<BloqueHorario> bloquesEnMismoDia = coloresAsignados.entrySet().stream()
-                .filter(e -> e.getValue().equals(color))
-                .map(e -> grafica.obtenerBloque(e.getKey()))
-                .collect(Collectors.toList());
-        
-        // Verificar conflictos usando el validador centralizado
-        for (BloqueHorario otro : bloquesEnMismoDia) {
-            if (validador.hayConflictoDirecto(bloque, otro)) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
     /**
-     * Descontinuado: Ya no se usa, se mantiene por compatibilidad
+     * Deprecated: logica antigua de disponibilidad (mantenido por compatibilidad).
      */
     @Deprecated
     private boolean esProfesorDisponible(BloqueHorario bloque, String dia, CatalogoRecursos catalogo) {
@@ -267,7 +231,7 @@ public class EstrategiaColoracion implements EstrategiaGeneracion {
     }
     
     /**
-     * Descontinuado: Ya no se usa, se mantiene por compatibilidad
+     * Deprecated: logica antigua para buscar el primer dia disponible.
      */
     @Deprecated
     private String encontrarDiaDisponible(BloqueHorario bloque, List<String> dias, CatalogoRecursos catalogo) {
