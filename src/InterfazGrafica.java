@@ -483,9 +483,24 @@ private void mostrarPlaceholderCrearHorario() {
     private void sincronizarPosicionesGestorACatalogo() {
         for (BloqueHorario bloqueCatalogo : catalogo.getTodosLosBloques()) {
             gestor.buscarBloquePorId(bloqueCatalogo.getId()).ifPresent(bGestor -> {
+                var inicio = bGestor.getHoraInicio();
+                var fin = bGestor.getHoraFin();
                 bloqueCatalogo.setDia(bGestor.getDia());
-                bloqueCatalogo.setHoraInicio(bGestor.getHoraInicio());
-                bloqueCatalogo.setHoraFin(bGestor.getHoraFin());
+
+                // Resetear horas previas para evitar validar contra valores antiguos
+                bloqueCatalogo.setHoraInicio(null);
+                bloqueCatalogo.setHoraFin(null);
+
+                // Solo aplicar si el intervalo es valido (o incompleto)
+                if (inicio != null && fin != null && inicio.isAfter(fin)) {
+                    return; // dejar horas en null si son inconsistentes
+                }
+                if (inicio != null) {
+                    bloqueCatalogo.setHoraInicio(inicio);
+                }
+                if (fin != null) {
+                    bloqueCatalogo.setHoraFin(fin);
+                }
             });
         }
     }

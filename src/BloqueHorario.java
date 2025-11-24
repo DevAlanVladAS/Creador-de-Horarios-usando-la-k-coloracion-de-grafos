@@ -253,7 +253,7 @@ public class BloqueHorario implements HorarioComponente, java.io.Serializable {
         if (inicio == null || fin == null) {
             return; // Permitir valores nulos cuando el bloque aun no esta posicionado.
         }
-        if (!inicio.isBefore(fin)) {
+        if (inicio.isAfter(fin)) {
             throw new IllegalArgumentException("La hora de inicio debe ser anterior a la hora de fin");
         }
     }

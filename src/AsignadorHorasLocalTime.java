@@ -232,12 +232,12 @@ public class AsignadorHorasLocalTime {
                 cadenaFin = actual.getHoraFin();
             }
 
-            if (Duration.between(cadenaInicio, cadenaFin).toMinutes() > 120) {
+            if (Duration.between(cadenaInicio, cadenaFin).toMinutes() > 180) {
                 return true;
             }
         }
 
-        if (Duration.between(mismos.get(0).getHoraInicio(), mismos.get(0).getHoraFin()).toMinutes() > 120) {
+        if (Duration.between(mismos.get(0).getHoraInicio(), mismos.get(0).getHoraFin()).toMinutes() > 180) {
             return true;
         }
 
@@ -282,7 +282,7 @@ public class AsignadorHorasLocalTime {
             }
         }
 
-        return minutos > 120;
+        return minutos > 300;
     }
 
     private LocalTime max(LocalTime a, LocalTime b) {
